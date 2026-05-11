@@ -65,8 +65,8 @@ class KaomojiApp:
 
         # Push initial data to frontend via evaluate_js
         import json
-        groups_json = json.dumps(self.api.data.get_groups(), ensure_ascii=False)
-        config_json = json.dumps(self.api.config.get_all(), ensure_ascii=False)
+        groups_json = json.dumps(self.api.get_groups(), ensure_ascii=False)
+        config_json = json.dumps(self.api.get_config(), ensure_ascii=False)
         self.window.evaluate_js(f"window._initData={groups_json};")
         self.window.evaluate_js(f"window._initConfig={config_json};")
         self.window.evaluate_js("if(typeof initFromPython==='function')initFromPython();")

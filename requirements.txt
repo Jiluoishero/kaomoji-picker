@@ -1,0 +1,6 @@
+pywebview
+keyboard
+pyperclip
+pywin32
+pystray
+Pillow

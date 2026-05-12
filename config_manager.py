@@ -4,7 +4,9 @@ import os
 DEFAULT_CONFIG = {
     "hotkey": "ctrl+`",
     "auto_start": False,
-    "double_click_interval": 300
+    "double_click_interval": 300,
+    "window_width": 420,
+    "window_height": 480
 }
 
 
@@ -20,7 +22,15 @@ class ConfigManager:
         if os.path.exists(self.filepath):
             try:
                 with open(self.filepath, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    config = json.load(f)
+                changed = False
+                for key, value in DEFAULT_CONFIG.items():
+                    if key not in config:
+                        config[key] = value
+                        changed = True
+                if changed:
+                    self._save_data(config)
+                return config
             except (json.JSONDecodeError, IOError):
                 pass
         config = dict(DEFAULT_CONFIG)

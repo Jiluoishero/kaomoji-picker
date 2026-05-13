@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 DEFAULT_DATA = {
     "groups": [
@@ -58,7 +59,8 @@ DEFAULT_DATA = {
 class DataManager:
     def __init__(self, filepath=None):
         if filepath is None:
-            self.filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json')
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            self.filepath = os.path.join(base_dir, 'data.json')
         else:
             self.filepath = filepath
         self.data = self._load()
@@ -127,6 +129,26 @@ class DataManager:
                 self.save()
                 return True
         return False
+
+    def move_item_by_index(self, source_group_index, source_item_index, target_group_index, target_item_index=None):
+        groups = self.data.get('groups', [])
+        if not (0 <= source_group_index < len(groups)) or not (0 <= target_group_index < len(groups)):
+            return False
+
+        source_items = groups[source_group_index].setdefault('items', [])
+        target_items = groups[target_group_index].setdefault('items', [])
+        if not (0 <= source_item_index < len(source_items)):
+            return False
+
+        item = source_items.pop(source_item_index)
+        if target_item_index is None:
+            target_item_index = len(target_items)
+        if source_group_index == target_group_index and target_item_index > source_item_index:
+            target_item_index -= 1
+        target_item_index = max(0, min(target_item_index, len(target_items)))
+        target_items.insert(target_item_index, item)
+        self.save()
+        return True
 
     def add_group(self, name):
         for group in self.data['groups']:

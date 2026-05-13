@@ -1,17 +1,19 @@
-import ctypes
+﻿import ctypes
+import json
 import os
 import sys
 import threading
 import time
 import unicodedata
+import winreg
 from ctypes import wintypes
 
 import win32api
 import win32con
 import win32gui
 import win32process
-from PySide6.QtCore import QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QSize, Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap, QRawFont, QTextCharFormat, QTextLayout
+from PySide6.QtCore import QEasingCurve, QMimeData, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal, QObject
+from PySide6.QtGui import QAction, QColor, QCursor, QDrag, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QRawFont, QTextCharFormat, QTextLayout
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -73,12 +75,15 @@ SWP_SHOWWINDOW = 0x0040
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMWCP_ROUND = 2
+DWMWCP_DONOTROUND = 1
 MOD_ALT = 0x0001
 MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 MOD_NOREPEAT = 0x4000
 HOTKEY_ID = 1
+RUN_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_VALUE_NAME = "KaomojiPicker"
 
 
 class MSG(ctypes.Structure):
@@ -94,6 +99,89 @@ class MSG(ctypes.Structure):
 
 class HotkeyBridge(QObject):
     pressed = Signal()
+
+
+class HotkeyEdit(QLineEdit):
+    hotkeyChanged = Signal(str)
+
+    def __init__(self, hotkey):
+        super().__init__(hotkey)
+        self.setReadOnly(True)
+        self.setPlaceholderText("按下快捷键")
+        self.setAttribute(Qt.WA_StyledBackground, False)
+        self.setTextMargins(8, 0, 8, 0)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key in (Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta, Qt.Key_unknown):
+            return
+        if key in (Qt.Key_Backspace, Qt.Key_Delete):
+            self.clear()
+            event.accept()
+            return
+
+        hotkey = self._event_to_hotkey(event)
+        if hotkey:
+            self.setText(hotkey)
+            self.hotkeyChanged.emit(hotkey)
+        event.accept()
+
+    def mousePressEvent(self, event):
+        self.selectAll()
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        theme = window_theme(self)
+        focused = self.hasFocus()
+        if theme == "dark":
+            background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
+            border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
+        else:
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
+            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+        draw_rounded_fill_box(painter, self.rect(), 10.0, background, border, 1.0)
+        painter.end()
+        super().paintEvent(event)
+
+    def _event_to_hotkey(self, event):
+        parts = []
+        modifiers = event.modifiers()
+        if modifiers & Qt.ControlModifier:
+            parts.append("ctrl")
+        if modifiers & Qt.AltModifier:
+            parts.append("alt")
+        if modifiers & Qt.ShiftModifier:
+            parts.append("shift")
+        if modifiers & Qt.MetaModifier:
+            parts.append("win")
+
+        key_text = self._key_name(event.key())
+        if not key_text:
+            sequence = QKeySequence(event.key())
+            key_text = sequence.toString(QKeySequence.PortableText).lower()
+        if not key_text:
+            return None
+        parts.append(key_text)
+        return "+".join(parts)
+
+    def _key_name(self, key):
+        if Qt.Key_A <= key <= Qt.Key_Z:
+            return chr(ord("a") + key - Qt.Key_A)
+        if Qt.Key_0 <= key <= Qt.Key_9:
+            return chr(ord("0") + key - Qt.Key_0)
+        if Qt.Key_F1 <= key <= Qt.Key_F24:
+            return f"f{key - Qt.Key_F1 + 1}"
+        special = {
+            Qt.Key_QuoteLeft: "`",
+            Qt.Key_Space: "space",
+            Qt.Key_Tab: "tab",
+            Qt.Key_Return: "enter",
+            Qt.Key_Enter: "enter",
+            Qt.Key_Escape: "esc",
+        }
+        return special.get(key)
 
 
 class HotkeyThread:
@@ -279,6 +367,125 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y() + margins.bottom()
 
 
+class PinIcon(QWidget):
+    """A tiny monochrome pushpin icon drawn with QPainter."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(18, 18)
+        self._color = QColor("#8b5730")
+
+    def set_color(self, color):
+        self._color = QColor(color)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(Qt.NoPen)
+        p.setBrush(self._color)
+        p.drawEllipse(QRectF(3, 2, 10, 10))
+        needle = QPolygonF([QPointF(6.5, 11), QPointF(9.5, 11), QPointF(8, 16)])
+        p.drawPolygon(needle)
+        p.end()
+
+
+class ThemeToggleButton(QToolButton):
+    """Draws a monochrome crescent moon (light) or sun (dark) icon."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._is_dark = False
+        self._color = QColor("#8b5730")
+        self.setText("")
+
+    def set_theme(self, theme):
+        self._is_dark = (theme == "dark")
+        self._color = QColor("#e4e0d0" if self._is_dark else "#8b5730")
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        import math
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        cx, cy = self.width() / 2, self.height() / 2
+
+        if self._is_dark:
+            # Sun: central disc + 8 rays
+            p.setPen(Qt.NoPen)
+            p.setBrush(self._color)
+            p.drawEllipse(QPointF(cx, cy), 4.5, 4.5)
+            pen = QPen(self._color, 1.8)
+            pen.setCapStyle(Qt.RoundCap)
+            p.setPen(pen)
+            for i in range(8):
+                angle = i * math.pi / 4
+                r1, r2 = 7, 10
+                p.drawLine(
+                    QPointF(cx + r1 * math.cos(angle), cy + r1 * math.sin(angle)),
+                    QPointF(cx + r2 * math.cos(angle), cy + r2 * math.sin(angle)),
+                )
+        else:
+            # Crescent moon via path subtraction
+            p.setPen(Qt.NoPen)
+            p.setBrush(self._color)
+            full = QPainterPath()
+            full.addEllipse(QRectF(cx - 7, cy - 7, 14, 14))
+            cut = QPainterPath()
+            cut.addEllipse(QRectF(cx - 2, cy - 9, 14, 14))
+            p.drawPath(full.subtracted(cut))
+
+        p.end()
+
+
+class SettingsButton(QToolButton):
+    """Draws a monochrome minimal gear icon."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._color = QColor("#8b5730")
+        self.setText("")
+
+    def set_color(self, color):
+        self._color = QColor(color)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        import math
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(Qt.NoPen)
+        p.setBrush(self._color)
+
+        cx, cy = self.width() / 2, self.height() / 2
+        teeth = 8
+        outer_r = 10.5
+        inner_r = 7.8
+        hole_r = 3.8
+
+        # Gear outline via alternating radii polygon
+        path = QPainterPath()
+        n = teeth * 4
+        for i in range(n):
+            angle = 2 * math.pi * i / n - math.pi / 2
+            r = outer_r if (i % 4 < 2) else inner_r
+            x = cx + r * math.cos(angle)
+            y = cy + r * math.sin(angle)
+            if i == 0:
+                path.moveTo(x, y)
+            else:
+                path.lineTo(x, y)
+        path.closeSubpath()
+
+        # Center hole
+        hole = QPainterPath()
+        hole.addEllipse(QPointF(cx, cy), hole_r, hole_r)
+        p.drawPath(path.subtracted(hole))
+        p.end()
+
+
 class TitleBar(QFrame):
     def __init__(self, window):
         super().__init__()
@@ -289,34 +496,48 @@ class TitleBar(QFrame):
         self.setFixedHeight(40)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setContentsMargins(16, 0, 8, 0)
         layout.setSpacing(8)
 
-        self.mode_dot = QLabel()
-        self.mode_dot.setObjectName("modeDot")
-        self.mode_text = QLabel("单次")
-        self.mode_text.setObjectName("modeText")
-        layout.addWidget(self.mode_dot)
-        layout.addWidget(self.mode_text)
+        self.pin_icon = PinIcon()
+        self.pin_icon.hide()
+        layout.addWidget(self.pin_icon)
         layout.addStretch(1)
 
-        self.settings_button = QToolButton()
-        self.settings_button.setText("⚙")
+        theme = self.window.config.get("theme", "light") if self.window else "light"
+
+        self.theme_button = ThemeToggleButton()
+        self.theme_button.set_theme(theme)
+        self.theme_button.setObjectName("titleIconButton")
+        self.theme_button.setToolTip("切换深浅色主题")
+
+        self.settings_button = SettingsButton()
+        self.settings_button.setObjectName("titleIconButton")
         self.settings_button.setToolTip("设置")
+
         self.close_button = QToolButton()
         self.close_button.setText("×")
+        self.close_button.setFont(QFont("Microsoft YaHei UI", 15))
         self.close_button.setToolTip("关闭")
         self.close_button.setObjectName("closeButton")
 
-        for button in (self.settings_button, self.close_button):
-            button.setFixedSize(30, 30)
+        for button in (self.theme_button, self.settings_button, self.close_button):
+            button.setFixedSize(32, 32)
             layout.addWidget(button)
 
+        self._apply_icon_colors(theme)
+
+    def _apply_icon_colors(self, theme):
+        c = "#e4e0d0" if theme == "dark" else "#8b5730"
+        self.pin_icon.set_color(c)
+        self.settings_button.set_color(c)
+        self.theme_button.set_theme(theme)
+
     def set_mode(self, mode):
-        self.mode_text.setText("固定" if mode == "pinned" else "单次")
-        self.mode_dot.setProperty("pinned", mode == "pinned")
-        self.mode_dot.style().unpolish(self.mode_dot)
-        self.mode_dot.style().polish(self.mode_dot)
+        if mode == "pinned":
+            self.pin_icon.show()
+        else:
+            self.pin_icon.hide()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -370,18 +591,357 @@ class ResizeHandle(QWidget):
         event.accept()
 
 
+def draw_rounded_fill_box(painter, rect, radius, background, border, border_width=1.0):
+    outer_rect = QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5)
+    inner_rect = outer_rect.adjusted(border_width, border_width, -border_width, -border_width)
+
+    outer_path = QPainterPath()
+    outer_path.addRoundedRect(outer_rect, radius, radius)
+    painter.fillPath(outer_path, border)
+
+    inner_path = QPainterPath()
+    inner_radius = max(0.0, radius - border_width)
+    inner_path.addRoundedRect(inner_rect, inner_radius, inner_radius)
+    painter.fillPath(inner_path, background)
+
+
+def window_theme(widget):
+    current = widget
+    while current is not None:
+        config = getattr(current, "config", None)
+        if config is not None:
+            return config.get("theme", "light")
+        current = current.parentWidget()
+    return "light"
+
+
+def in_dark_dialog(widget):
+    current = widget
+    while current is not None:
+        if current.objectName() == "darkDialog":
+            return True
+        current = current.parentWidget()
+    return False
+
+
+class RoundedFrame(QFrame):
+    def __init__(self, role, window=None):
+        super().__init__()
+        self.role = role
+        self.window = window
+        self.setAttribute(Qt.WA_StyledBackground, False)
+        self.setAutoFillBackground(False)
+
+    def _colors(self):
+        theme = self.window.config.get("theme", "light") if self.window else window_theme(self)
+        if self.role == "panel":
+            if theme == "dark":
+                gradient = QLinearGradient(0, 0, self.width(), self.height())
+                gradient.setColorAt(0, QColor(14, 16, 36, 252))
+                gradient.setColorAt(0.5, QColor(20, 18, 46, 252))
+                gradient.setColorAt(1, QColor(13, 12, 28, 252))
+                return gradient, QColor(217, 179, 104, 64), 30.0, 1.0
+            return QColor(232, 228, 216, 250), QColor(103, 96, 78, 38), 30.0, 1.0
+        if self.role == "sortBar":
+            if theme == "dark":
+                return QColor(22, 24, 46, 235), QColor(217, 179, 104, 64), 12.0, 1.0
+            return QColor(240, 236, 224, 235), QColor(103, 96, 78, 38), 12.0, 1.0
+        if self.role == "addBox":
+            if theme == "dark":
+                return QColor(22, 24, 46, 235), QColor(217, 179, 104, 51), 12.0, 1.0
+            return QColor(240, 236, 224, 235), QColor(103, 96, 78, 31), 12.0, 1.0
+        return QColor(0, 0, 0, 0), QColor(0, 0, 0, 0), 0.0, 0.0
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        background, border, radius, border_width = self._colors()
+        draw_rounded_fill_box(painter, self.rect(), radius, background, border, border_width)
+
+
+class RoundedButton(QPushButton):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setAttribute(Qt.WA_StyledBackground, False)
+
+    def _colors(self):
+        object_name = self.objectName()
+        pressed = self.isDown()
+        hovered = self.underMouse()
+        theme = window_theme(self)
+        if in_dark_dialog(self):
+            if object_name == "dangerButton":
+                return QColor(240, 72, 72, 46), QColor(240, 72, 72, 107), 7.0, 1.0
+            if object_name == "primaryButton":
+                return QColor(124, 111, 239, 61 if not hovered else 82), QColor(124, 111, 239, 112), 7.0, 1.0
+            if hovered or pressed:
+                return QColor(255, 255, 255, 28 if pressed else 19), QColor(255, 255, 255, 20), 7.0, 1.0
+            return QColor(0, 0, 0, 0), QColor(0, 0, 0, 0), 7.0, 1.0
+        if object_name == "dangerButton":
+            return QColor(240, 72, 72, 46), QColor(240, 72, 72, 107), 7.0, 1.0
+        if object_name == "primaryButton":
+            if theme == "dark":
+                bg = QColor(217, 179, 104, 89 if hovered else 56)
+                border = QColor(217, 179, 104, 179 if hovered else 128)
+            else:
+                bg = QColor(166, 98, 54, 56 if hovered else 31)
+                border = QColor(166, 98, 54, 140 if hovered else 89)
+            if pressed:
+                bg = bg.darker(110)
+            return bg, border, 9.0, 1.0
+        if hovered or pressed:
+            if theme == "dark":
+                bg = QColor(217, 179, 104, 64 if pressed else 31)
+                border = QColor(217, 179, 104, 51)
+            else:
+                bg = QColor(166, 98, 54, 38 if pressed else 20)
+                border = QColor(103, 96, 78, 31)
+            return bg, border, 9.0, 1.0
+        return QColor(0, 0, 0, 0), QColor(0, 0, 0, 0), 9.0, 1.0
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        background, border, radius, border_width = self._colors()
+        if background.alpha() or border.alpha():
+            draw_rounded_fill_box(painter, self.rect(), radius, background, border, border_width)
+        painter.end()
+        super().paintEvent(event)
+
+
+class RoundedLineEdit(QLineEdit):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setAttribute(Qt.WA_StyledBackground, False)
+        self.setTextMargins(8, 0, 8, 0)
+
+    def _colors(self):
+        if in_dark_dialog(self):
+            return QColor(18, 19, 31, 245), QColor(124, 111, 239, 163)
+        theme = window_theme(self)
+        focused = self.hasFocus()
+        if theme == "dark":
+            background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
+            border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
+        else:
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
+            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+        return background, border
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        background, border = self._colors()
+        draw_rounded_fill_box(painter, self.rect(), 10.0, background, border, 1.0)
+        painter.end()
+        super().paintEvent(event)
+
+
+class RoundedTextEdit(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, False)
+        self.setViewportMargins(8, 8, 8, 8)
+        self.viewport().setAutoFillBackground(False)
+
+    def _colors(self):
+        theme = window_theme(self)
+        focused = self.hasFocus()
+        if theme == "dark":
+            background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
+            border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
+        else:
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
+            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+        return background, border
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        background, border = self._colors()
+        draw_rounded_fill_box(painter, self.rect(), 10.0, background, border, 1.0)
+        painter.end()
+        super().paintEvent(event)
+
+
+class RoundedSwitch(QCheckBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(46, 26)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAttribute(Qt.WA_StyledBackground, False)
+
+    def paintEvent(self, event):
+        theme = window_theme(self)
+        checked = self.isChecked()
+        hovered = self.underMouse()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        if theme == "dark":
+            background = QColor("#d9b368") if checked else (QColor(22, 24, 46, 245) if hovered else QColor(12, 14, 28, 245))
+            border = QColor("#d9b368") if checked or hovered else QColor(217, 179, 104, 77)
+            knob = QColor(18, 19, 31, 245) if checked else QColor(217, 179, 104, 180)
+        else:
+            background = QColor("#a66236") if checked else (QColor(255, 255, 255, 255) if hovered else QColor(250, 248, 242, 245))
+            border = QColor("#a66236") if checked or hovered else QColor(103, 96, 78, 64)
+            knob = QColor(255, 255, 255, 245) if checked else QColor(103, 96, 78, 150)
+
+        draw_rounded_fill_box(painter, QRectF(2, 1, 42, 24), 12.0, background, border, 1.0)
+        knob_x = 24 if checked else 6
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(knob)
+        painter.drawEllipse(QRectF(knob_x, 5, 16, 16))
+
+
+class SortableTabBar(QTabBar):
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+        self.setAcceptDrops(True)
+        self.drop_target_index = -1
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            index = self.tabAt(event.position().toPoint())
+            if index >= 0:
+                self.drop_target_index = index
+                self.update()
+                groups = self.window.data.get_groups()
+                if index < len(groups):
+                    event.acceptProposedAction()
+            else:
+                self.drop_target_index = -1
+                self.update()
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dragLeaveEvent(self, event):
+        self.drop_target_index = -1
+        self.update()
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            index = self.tabAt(event.position().toPoint())
+            if index >= 0 and self.window._drop_symbol_on_group(event.mimeData(), index):
+                self.drop_target_index = -1
+                self.update()
+                event.acceptProposedAction()
+                return
+        super().dropEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        theme = self.window.config.get("theme", "light") if self.window else "light"
+        indicator_color = QColor("#d9b368") if theme == "dark" else QColor("#a66236")
+        feedback_brush = QColor(217, 179, 104, 30) if theme == "dark" else QColor(166, 98, 54, 30)
+
+        # Draw the beautiful indicator with a dot break for the selected tab
+        selected_index = self.currentIndex()
+        if selected_index >= 0:
+            rect = self.tabRect(selected_index)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(indicator_color)
+
+            # Indicator geometry
+            line_h = 3.5
+            line_y = rect.bottom() - 4.5
+            start_x = rect.left() + 12
+            end_x = rect.right() - 16
+            if end_x > start_x:
+                painter.drawRoundedRect(QRectF(start_x, line_y, end_x - start_x, line_h), 1.75, 1.75)
+
+            # Detached playful dot break
+            dot_x = rect.right() - 11
+            painter.drawEllipse(QRectF(dot_x, line_y, line_h, line_h))
+
+        if self.drop_target_index >= 0:
+            rect = self.tabRect(self.drop_target_index)
+            if rect.isValid():
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(feedback_brush)
+                painter.drawRoundedRect(rect.adjusted(1, 2, -1, -2), 9, 9)
+                painter.setPen(indicator_color)
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRoundedRect(rect.adjusted(1, 2, -1, -2), 9, 9)
+
+
+class SymbolContainer(QWidget):
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+        self.setAcceptDrops(True)
+        self.insertion_index = None
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            self.insertion_index = self.window._symbol_insert_index_at(event.position().toPoint())
+            self.update()
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dragLeaveEvent(self, event):
+        self.insertion_index = None
+        self.update()
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasFormat("application/x-kaomoji-symbol"):
+            if self.window._drop_symbol_at(event.mimeData(), event.position().toPoint()):
+                self.insertion_index = None
+                self.update()
+                event.acceptProposedAction()
+                return
+        super().dropEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.insertion_index is None:
+            return
+        marker = self.window._symbol_insert_marker_rect(self.insertion_index)
+        if marker is None:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#b8b0ff"))
+        painter.drawRoundedRect(marker, 2, 2)
+
+
 class SymbolButton(QFrame):
     clicked = Signal()
 
-    def __init__(self, symbol, font_resolver):
+    def __init__(self, symbol, font_resolver, window=None, group_index=0, item_index=0):
         super().__init__()
         self.symbol = symbol
         self.font_resolver = font_resolver
+        self.window = window
+        self.group_index = group_index
+        self.item_index = item_index
+        self.drag_start = None
         self.text_ranges = self._text_ranges(symbol, font_resolver)
         self.setObjectName("symbolButton")
         self.setCursor(Qt.PointingHandCursor)
         self.setProperty("pressed", False)
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAttribute(Qt.WA_StyledBackground, False)
 
         width = self._measure_width(symbol, font_resolver) + 38
         self.setMinimumWidth(max(42, width))
@@ -426,13 +986,20 @@ class SymbolButton(QFrame):
 
     def _format_ranges(self):
         formats = []
+        is_pressed = self.property("pressed")
+        is_hovered = self.underMouse()
+        theme = self.window.config.get("theme", "light") if self.window else "light"
+        if theme == "dark":
+            text_color = QColor("#cca652") if is_pressed else (QColor("#d9b368") if is_hovered else QColor("#e4e8f4"))
+        else:
+            text_color = QColor("#8a552e") if is_pressed else (QColor("#a66236") if is_hovered else QColor("#67604e"))
         for start, length, family in self.text_ranges:
             fmt = QTextCharFormat()
             font = QFont(family, 12)
             font.setHintingPreference(QFont.PreferNoHinting)
             font.setStyleStrategy(QFont.PreferAntialias)
             fmt.setFont(font)
-            fmt.setForeground(QColor("#e4e8f4"))
+            fmt.setForeground(text_color)
             fmt_range = QTextLayout.FormatRange()
             fmt_range.start = start
             fmt_range.length = length
@@ -455,11 +1022,57 @@ class SymbolButton(QFrame):
         layout, line = self._layout_text()
         return int(line.naturalTextWidth() + 0.99)
 
+    def _button_style(self):
+        theme = self.window.config.get("theme", "light") if self.window else "light"
+        is_pressed = bool(self.property("pressed"))
+        is_hovered = self.underMouse()
+
+        if theme == "dark":
+            if is_pressed:
+                background = QColor(217, 179, 104, 46)
+                border = QColor(217, 179, 104, 204)
+                border_width = 2.0
+            elif is_hovered:
+                background = QColor(42, 40, 78, 240)
+                border = QColor(217, 179, 104, 128)
+                border_width = 2.0
+            else:
+                background = QColor(28, 30, 56, 225)
+                border = QColor(255, 255, 255, 10)
+                border_width = 1.0
+        else:
+            if is_pressed:
+                background = QColor(166, 98, 54, 31)
+                border = QColor("#a66236")
+                border_width = 2.0
+            elif is_hovered:
+                background = QColor(255, 255, 255, 255)
+                border = QColor(166, 98, 54, 102)
+                border_width = 2.0
+            else:
+                background = QColor(250, 248, 242, 230)
+                border = QColor(103, 96, 78, 15)
+                border_width = 1.0
+
+        return background, border, border_width
+
     def paintEvent(self, event):
-        super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         painter.setRenderHint(QPainter.Antialiasing, True)
+
+        background, border, border_width = self._button_style()
+        outer_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        inner_rect = outer_rect.adjusted(border_width, border_width, -border_width, -border_width)
+
+        outer_path = QPainterPath()
+        outer_path.addRoundedRect(outer_rect, 14, 14)
+        painter.fillPath(outer_path, border)
+
+        inner_path = QPainterPath()
+        inner_radius = max(0.0, 14.0 - border_width)
+        inner_path.addRoundedRect(inner_rect, inner_radius, inner_radius)
+        painter.fillPath(inner_path, background)
 
         layout, line = self._layout_text(max(1, self.width() - 12))
         text_width = line.naturalTextWidth()
@@ -470,21 +1083,63 @@ class SymbolButton(QFrame):
             y += 1
         layout.draw(painter, QPointF(x, y))
 
+    def enterEvent(self, event):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            self.drag_start = event.position().toPoint()
             self.setProperty("pressed", True)
-            self.style().unpolish(self)
-            self.style().polish(self)
+            self.update()
             event.accept()
+
+    def mouseMoveEvent(self, event):
+        if (
+            self.window
+            and self.drag_start is not None
+            and event.buttons() & Qt.LeftButton
+            and (event.position().toPoint() - self.drag_start).manhattanLength() >= QApplication.startDragDistance()
+        ):
+            self.setProperty("pressed", False)
+            self.update()
+            payload = {
+                "group_index": self.group_index,
+                "item_index": self.item_index,
+                "symbol": self.symbol,
+            }
+            mime = QMimeData()
+            mime.setData("application/x-kaomoji-symbol", json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+            drag = QDrag(self)
+            drag.setMimeData(mime)
+            drag.setPixmap(self.grab())
+            drag.setHotSpot(event.position().toPoint())
+            drag.exec(Qt.MoveAction)
+            self.drag_start = None
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         was_pressed = self.property("pressed")
         self.setProperty("pressed", False)
-        self.style().unpolish(self)
-        self.style().polish(self)
-        if was_pressed and self.rect().contains(event.position().toPoint()):
+        self.update()
+        if was_pressed and self.drag_start is not None and self.rect().contains(event.position().toPoint()):
             self.clicked.emit()
+        self.drag_start = None
         event.accept()
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        self.update()
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self.update()
 
 
 class KaomojiWindow(QWidget):
@@ -512,7 +1167,7 @@ class KaomojiWindow(QWidget):
             "Segoe UI Symbol",
             "Segoe UI Emoji",
             "LXGW WenKai",
-            "霞鹜文楷",
+            "闇為箿鏂囨シ",
             "Gadugi",
             "Cambria Math",
         ]
@@ -527,7 +1182,7 @@ class KaomojiWindow(QWidget):
             | Qt.WindowStaysOnTopHint
         )
         self.setWindowFlags(flags)
-        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setAutoFillBackground(False)
         self.setMouseTracking(True)
@@ -611,19 +1266,13 @@ class KaomojiWindow(QWidget):
             return
         hwnd = self._visible_panel_hwnd() if self.isVisible() else self._hwnd()
         try:
-            corner = ctypes.c_int(DWMWCP_ROUND)
+            # Keep DWM from adding a second rounding layer.
+            corner = ctypes.c_int(DWMWCP_DONOTROUND)
             ctypes.windll.dwmapi.DwmSetWindowAttribute(
                 hwnd,
                 DWMWA_WINDOW_CORNER_PREFERENCE,
                 ctypes.byref(corner),
                 ctypes.sizeof(corner),
-            )
-            dark = ctypes.c_int(1)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_USE_IMMERSIVE_DARK_MODE,
-                ctypes.byref(dark),
-                ctypes.sizeof(dark),
             )
         except Exception as exc:
             log(f"DWM style failed: {exc}")
@@ -632,20 +1281,23 @@ class KaomojiWindow(QWidget):
         self.allow_activation = bool(enabled)
         self._apply_window_activation_policy()
 
+
     def register_hotkey(self, hotkey):
         if sys.platform != "win32":
-            return
+            return False
         self.unregister_hotkey()
         try:
             modifiers, key = parse_hotkey(hotkey)
         except ValueError as exc:
             log(str(exc))
-            return
+            return False
         hwnd = self._hwnd()
         if ctypes.windll.user32.RegisterHotKey(hwnd, HOTKEY_ID, modifiers, key):
             log(f"Registered window hotkey '{hotkey}' hwnd={hwnd} modifiers={modifiers} key={key}")
+            return True
         else:
             log(f"Failed to register window hotkey '{hotkey}' error={ctypes.get_last_error()} hwnd={hwnd}")
+            return False
 
     def unregister_hotkey(self):
         if sys.platform != "win32":
@@ -654,6 +1306,18 @@ class KaomojiWindow(QWidget):
             ctypes.windll.user32.UnregisterHotKey(self._hwnd(), HOTKEY_ID)
         except Exception:
             pass
+
+    def toggle_theme(self):
+        current = self.config.get("theme", "light")
+        new_theme = "dark" if current == "light" else "light"
+        self.config.set("theme", new_theme)
+        self._apply_styles()
+        self._apply_dwm_window_style()
+        if hasattr(self, "titlebar"):
+            self.titlebar._apply_icon_colors(new_theme)
+        if hasattr(self, "tabs"):
+            self.tabs.update()
+        self._render_symbols()
 
     def _resize_from_config(self):
         width = int(self.config.get("window_width", DEFAULT_WINDOW_WIDTH))
@@ -677,7 +1341,7 @@ class KaomojiWindow(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
 
-        self.panel = QFrame()
+        self.panel = RoundedFrame("panel", self)
         self.panel.setObjectName("panel")
         self.panel.setAutoFillBackground(False)
         root.addWidget(self.panel)
@@ -688,6 +1352,7 @@ class KaomojiWindow(QWidget):
 
         self.titlebar = TitleBar(self)
         panel_layout.addWidget(self.titlebar)
+        self.titlebar.theme_button.clicked.connect(self.toggle_theme)
         self.titlebar.settings_button.clicked.connect(self._show_settings)
         self.titlebar.close_button.clicked.connect(self.hide_panel)
 
@@ -721,7 +1386,7 @@ class KaomojiWindow(QWidget):
 
         tab_row = QHBoxLayout()
         tab_row.setContentsMargins(0, 0, 0, 0)
-        self.tabs = QTabBar()
+        self.tabs = SortableTabBar(self)
         self.tabs.setExpanding(False)
         self.tabs.setMovable(True)
         self.tabs.currentChanged.connect(self._set_current_group)
@@ -731,17 +1396,17 @@ class KaomojiWindow(QWidget):
         tab_row.addWidget(self.tabs, 1)
         layout.addLayout(tab_row)
 
-        self.add_box = QFrame()
+        self.add_box = RoundedFrame("addBox", self)
         self.add_box.setObjectName("addBox")
         add_layout = QVBoxLayout(self.add_box)
         add_layout.setContentsMargins(10, 10, 10, 10)
         self.add_hint = QLabel("每行输入一个符号")
-        self.add_text = QTextEdit()
+        self.add_text = RoundedTextEdit()
         self.add_text.setFixedHeight(76)
         add_buttons = QHBoxLayout()
         add_buttons.addStretch(1)
-        cancel = QPushButton("取消")
-        confirm = QPushButton("确认添加")
+        cancel = RoundedButton("取消")
+        confirm = RoundedButton("确认添加")
         cancel.clicked.connect(self._exit_add_mode)
         confirm.clicked.connect(self._confirm_add)
         add_buttons.addWidget(cancel)
@@ -757,7 +1422,7 @@ class KaomojiWindow(QWidget):
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.symbol_container = QWidget()
+        self.symbol_container = SymbolContainer(self)
         self.symbol_container.setMinimumHeight(1)
         self.scroll.setWidget(self.symbol_container)
         layout.addWidget(self.scroll, 1)
@@ -771,7 +1436,7 @@ class KaomojiWindow(QWidget):
         layout.setSpacing(12)
 
         header = QHBoxLayout()
-        back = QPushButton("‹")
+        back = RoundedButton("‹")
         back.setFixedSize(30, 30)
         back.clicked.connect(self._show_main)
         title = QLabel("设置")
@@ -782,16 +1447,21 @@ class KaomojiWindow(QWidget):
         layout.addLayout(header)
 
         hotkey_row = self._setting_row("快捷键", "全局唤起面板")
-        self.hotkey_edit = QLineEdit(self.config.get("hotkey", "ctrl+`"))
+        self.hotkey_edit = HotkeyEdit(self.config.get("hotkey", "ctrl+q"))
         self.hotkey_edit.setFixedWidth(150)
-        self.hotkey_edit.editingFinished.connect(self._update_hotkey)
+        self.hotkey_edit.hotkeyChanged.connect(self._update_hotkey)
         hotkey_row.addWidget(self.hotkey_edit)
         layout.addLayout(hotkey_row)
 
         auto_row = self._setting_row("开机自启", "登录 Windows 后自动运行")
-        self.autostart_check = QCheckBox()
-        self.autostart_check.setChecked(bool(self.config.get("auto_start", False)))
+        self.autostart_check = RoundedSwitch()
+        self.autostart_check.setChecked(self._is_auto_start_enabled())
         self.autostart_check.toggled.connect(self._set_auto_start)
+        self.autostart_state = QLabel()
+        self.autostart_state.setObjectName("settingDesc")
+        self._sync_autostart_state_label(self.autostart_check.isChecked())
+        self.autostart_check.toggled.connect(self._sync_autostart_state_label)
+        auto_row.addWidget(self.autostart_state)
         auto_row.addWidget(self.autostart_check)
         layout.addLayout(auto_row)
 
@@ -812,77 +1482,100 @@ class KaomojiWindow(QWidget):
         return row
 
     def _apply_styles(self):
-        self.setStyleSheet(
-            """
+        theme = self.config.get("theme", "light")
+        if theme == "dark":
+            qss = """
             #panel {
-                background: rgba(18, 19, 31, 250);
-                border: 1px solid rgba(124, 111, 239, 0.18);
-                border-radius: 14px;
+                background: transparent;
+                border: none;
             }
             #titlebar {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(255, 255, 255, 0.055),
-                    stop:1 rgba(255, 255, 255, 0.010));
-                border-top-left-radius: 14px;
-                border-top-right-radius: 14px;
-                border-bottom: 1px solid rgba(124, 111, 239, 0.10);
+                    stop:0 rgba(255, 255, 255, 0.06),
+                    stop:1 rgba(255, 255, 255, 0.01));
+                border-bottom: 1px solid rgba(217, 179, 104, 0.12);
             }
-            #modeDot {
-                min-width: 7px; max-width: 7px;
-                min-height: 7px; max-height: 7px;
-                border-radius: 4px;
-                background: #7c6fef;
-            }
-            #modeDot[pinned="true"] { background: #34d399; }
+            #pinIcon { color: #e4e0d0; font-size: 14px; }
             * { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
-            #modeText, QLabel { color: #cdd6f4; }
-            #modeText { color: #a6adc8; font-size: 12px; font-weight: 600; }
-            QToolButton, QPushButton {
+            QLabel { color: #fff5d6; }
+            QToolButton {
                 background: transparent;
-                color: #cdd6f4;
+                color: #fff5d6;
                 border: 1px solid transparent;
-                border-radius: 7px;
-                padding: 5px 10px;
+                border-radius: 9px;
+                padding: 5px 12px;
                 font-size: 13px;
+                font-weight: 600;
             }
-            QToolButton:hover, QPushButton:hover {
-                background: rgba(255, 255, 255, 0.075);
-                border-color: rgba(255, 255, 255, 0.06);
+            QPushButton {
+                background: transparent;
+                color: #fff5d6;
+                border: none;
+                padding: 5px 12px;
+                font-size: 13px;
+                font-weight: 600;
             }
-            QToolButton:pressed, QPushButton:pressed {
-                background: rgba(124, 111, 239, 0.20);
+            QToolButton:hover {
+                background: rgba(217, 179, 104, 0.12);
+                border-color: transparent;
+                color: #d9b368;
             }
-            QToolButton#closeButton:hover { background: #f04848; color: white; }
+            QPushButton:hover {
+                background: transparent;
+                border: none;
+                color: #d9b368;
+            }
+            QToolButton:pressed {
+                background: rgba(217, 179, 104, 0.25);
+            }
+            QPushButton:pressed {
+                background: transparent;
+                border: none;
+            }
+            #titlebar QToolButton {
+                padding: 0px;
+                font-family: "Segoe UI Symbol", "Microsoft YaHei UI", sans-serif;
+                font-size: 15px;
+            }
+            QToolButton#titleIconButton {
+                font-size: 16px;
+            }
+            QToolButton#closeButton {
+                padding: 0px;
+                font-size: 18px;
+            }
+            QToolButton#closeButton:hover { background: #f04848; color: white; border-color: transparent; }
             QTabBar::tab {
                 color: #a6adc8;
                 background: transparent;
-                padding: 7px 15px;
-                border-radius: 7px;
+                padding: 8px 16px 12px 16px;
+                border-radius: 9px;
                 margin-right: 4px;
                 border: 1px solid transparent;
+                font-size: 14px;
+                font-weight: 600;
             }
             QTabBar::tab:hover {
-                color: #e4e8f4;
-                background: rgba(255, 255, 255, 0.055);
+                color: #ffdda1;
+                background: rgba(217, 179, 104, 0.08);
             }
             QTabBar::tab:selected {
-                color: #b8b0ff;
-                background: rgba(124, 111, 239, 0.18);
-                border-color: rgba(124, 111, 239, 0.20);
+                color: #d9b368;
+                background: transparent;
             }
             QScrollArea, QWidget { background: transparent; }
             QScrollBar:vertical {
                 background: transparent;
-                width: 6px;
+                width: 8px;
                 margin: 4px 1px 4px 1px;
             }
             QScrollBar::handle:vertical {
-                background: rgba(166, 173, 200, 0.22);
-                border-radius: 3px;
+                background: rgba(217, 179, 104, 0.22);
+                border-radius: 4px;
                 min-height: 24px;
             }
             QScrollBar::handle:vertical:hover {
-                background: rgba(166, 173, 200, 0.36);
+                background: rgba(217, 179, 104, 0.45);
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
@@ -903,65 +1596,298 @@ class KaomojiWindow(QWidget):
                 background: transparent;
             }
             QMenu {
-                color: #e4e8f4;
-                background-color: rgba(24, 25, 40, 252);
-                border: 1px solid rgba(124, 111, 239, 0.28);
-                border-radius: 9px;
+                color: #fff5d6;
+                background-color: rgba(20, 22, 44, 252);
+                border: 1px solid rgba(217, 179, 104, 0.35);
+                border-radius: 12px;
                 padding: 6px;
                 font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
                 font-size: 13px;
+                font-weight: 600;
             }
             QMenu::item {
-                color: #e4e8f4;
+                color: #fff5d6;
                 background: transparent;
                 padding: 8px 26px 8px 12px;
-                border-radius: 7px;
+                border-radius: 8px;
                 min-width: 150px;
             }
             QMenu::item:selected {
-                color: #ffffff;
-                background: rgba(124, 111, 239, 0.30);
+                color: #d9b368;
+                background: rgba(217, 179, 104, 0.15);
             }
             QMenu::item:disabled {
                 color: rgba(166, 173, 200, 0.42);
             }
             QMenu::separator {
                 height: 1px;
-                background: rgba(166, 173, 200, 0.18);
+                background: rgba(217, 179, 104, 0.15);
                 margin: 5px 8px;
             }
             #symbolButton {
-                background: rgba(34, 36, 64, 225);
-                border: 1px solid rgba(255, 255, 255, 0.035);
-                border-radius: 9px;
+                background: transparent;
+                border: none;
             }
             #symbolButton:hover {
-                background: rgba(42, 45, 80, 235);
-                border-color: rgba(124, 111, 239, 0.25);
+                background: transparent;
+                border: none;
             }
             #symbolButton[pressed="true"] {
-                background: rgba(124, 111, 239, 0.24);
+                background: transparent;
+                border: none;
+            }
+            #sortBar {
+                background: transparent;
+                border: none;
+            }
+            QPushButton#primaryButton {
+                background: transparent;
+                border: none;
+                color: #d9b368;
+            }
+            QPushButton#primaryButton:hover {
+                background: transparent;
+                border: none;
             }
             #addBox {
-                background: rgba(26, 28, 46, 235);
-                border: 1px solid rgba(124, 111, 239, 0.14);
-                border-radius: 10px;
+                background: transparent;
+                border: none;
             }
             QTextEdit, QLineEdit {
-                color: #e4e8f4;
-                background: rgba(15, 16, 25, 235);
-                border: 1px solid rgba(166, 173, 200, 0.18);
-                border-radius: 8px;
-                padding: 7px;
+                color: #fff5d6;
+                background: transparent;
+                border: none;
+                padding: 0px;
+                font-size: 13px;
             }
             QTextEdit:focus, QLineEdit:focus {
-                border-color: rgba(124, 111, 239, 0.65);
+                background: transparent;
+                border: none;
             }
-            #settingsTitle { font-size: 15px; font-weight: 600; }
-            #settingLabel { font-size: 13px; font-weight: 600; }
-            #settingDesc { font-size: 11px; color: #8a8faa; }
+            QCheckBox {
+                min-width: 46px;
+                min-height: 26px;
+                spacing: 0px;
+            }
+            QCheckBox::indicator {
+                width: 0px;
+                height: 0px;
+            }
+            QCheckBox::indicator:hover {
+                background: transparent;
+                border: none;
+            }
+            QCheckBox::indicator:checked {
+                background: transparent;
+                border: none;
+            }
+            #settingsTitle { font-size: 16px; font-weight: 600; color: #d9b368; }
+            #settingLabel { font-size: 14px; font-weight: 600; color: #fff5d6; }
+            #settingDesc { font-size: 12px; color: #a6adc8; }
             """
-        )
+        else:
+            qss = """
+            #panel {
+                background: transparent;
+                border: none;
+            }
+            #titlebar {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.4),
+                    stop:1 rgba(255, 255, 255, 0.1));
+                border-bottom: 1px solid rgba(103, 96, 78, 0.08);
+            }
+            #pinIcon { color: #8b5730; font-size: 14px; }
+            * { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
+            QLabel { color: #67604e; }
+            QToolButton {
+                background: transparent;
+                color: #67604e;
+                border: 1px solid transparent;
+                border-radius: 9px;
+                padding: 5px 12px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QPushButton {
+                background: transparent;
+                color: #67604e;
+                border: none;
+                padding: 5px 12px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QToolButton:hover {
+                background: rgba(103, 96, 78, 0.08);
+                border-color: transparent;
+                color: #a66236;
+            }
+            QPushButton:hover {
+                background: transparent;
+                border: none;
+                color: #a66236;
+            }
+            QToolButton:pressed {
+                background: rgba(166, 98, 54, 0.15);
+            }
+            QPushButton:pressed {
+                background: transparent;
+                border: none;
+            }
+            #titlebar QToolButton {
+                padding: 0px;
+                font-family: "Segoe UI Symbol", "Microsoft YaHei UI", sans-serif;
+                font-size: 15px;
+            }
+            QToolButton#titleIconButton {
+                font-size: 16px;
+            }
+            QToolButton#closeButton {
+                padding: 0px;
+                font-size: 18px;
+            }
+            QToolButton#closeButton:hover { background: #f04848; color: white; border-color: transparent; }
+            QTabBar::tab {
+                color: #9e9785;
+                background: transparent;
+                padding: 8px 16px 12px 16px;
+                border-radius: 9px;
+                margin-right: 4px;
+                border: 1px solid transparent;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            QTabBar::tab:hover {
+                color: #a66236;
+                background: rgba(103, 96, 78, 0.05);
+            }
+            QTabBar::tab:selected {
+                color: #8a552e;
+                background: transparent;
+            }
+            QScrollArea, QWidget { background: transparent; }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 8px;
+                margin: 4px 1px 4px 1px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(103, 96, 78, 0.18);
+                border-radius: 4px;
+                min-height: 24px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(103, 96, 78, 0.35);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                height: 0px;
+                background: transparent;
+            }
+            QScrollBar:horizontal {
+                height: 0px;
+                background: transparent;
+            }
+            QScrollBar::handle:horizontal,
+            QScrollBar::add-line:horizontal,
+            QScrollBar::sub-line:horizontal,
+            QScrollBar::add-page:horizontal,
+            QScrollBar::sub-page:horizontal {
+                width: 0px;
+                height: 0px;
+                background: transparent;
+            }
+            QMenu {
+                color: #67604e;
+                background-color: rgba(242, 239, 230, 252);
+                border: 1px solid rgba(103, 96, 78, 0.2);
+                border-radius: 12px;
+                padding: 6px;
+                font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QMenu::item {
+                color: #67604e;
+                background: transparent;
+                padding: 8px 26px 8px 12px;
+                border-radius: 8px;
+                min-width: 150px;
+            }
+            QMenu::item:selected {
+                color: #a66236;
+                background: rgba(166, 98, 54, 0.1);
+            }
+            QMenu::item:disabled {
+                color: rgba(103, 96, 78, 0.35);
+            }
+            QMenu::separator {
+                height: 1px;
+                background: rgba(103, 96, 78, 0.12);
+                margin: 5px 8px;
+            }
+            #symbolButton {
+                background: transparent;
+                border: none;
+            }
+            #symbolButton:hover {
+                background: transparent;
+                border: none;
+            }
+            #symbolButton[pressed="true"] {
+                background: transparent;
+                border: none;
+            }
+            #sortBar {
+                background: transparent;
+                border: none;
+            }
+            QPushButton#primaryButton {
+                background: transparent;
+                border: none;
+                color: #a66236;
+            }
+            QPushButton#primaryButton:hover {
+                background: transparent;
+                border: none;
+            }
+            #addBox {
+                background: transparent;
+                border: none;
+            }
+            QTextEdit, QLineEdit {
+                color: #67604e;
+                background: transparent;
+                border: none;
+                padding: 0px;
+                font-size: 13px;
+            }
+            QTextEdit:focus, QLineEdit:focus {
+                background: transparent;
+                border: none;
+            }
+            QCheckBox {
+                min-width: 46px;
+                min-height: 26px;
+                spacing: 0px;
+            }
+            QCheckBox::indicator {
+                width: 0px;
+                height: 0px;
+            }
+            QCheckBox::indicator:hover {
+                background: transparent;
+                border: none;
+            }
+            QCheckBox::indicator:checked {
+                background: transparent;
+                border: none;
+            }
+            #settingsTitle { font-size: 16px; font-weight: 600; color: #a66236; }
+            #settingLabel { font-size: 14px; font-weight: 600; color: #67604e; }
+            #settingDesc { font-size: 12px; color: #8f8773; }
+            """
+        self.setStyleSheet(qss)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1194,9 +2120,9 @@ class KaomojiWindow(QWidget):
             return
 
         group = groups[self.current_group_index]
-        for item in group.get("items", []):
+        for item_index, item in enumerate(group.get("items", [])):
             symbol = item["symbol"]
-            button = SymbolButton(symbol, self._font_for_char)
+            button = SymbolButton(symbol, self._font_for_char, self, self.current_group_index, item_index)
             button.setParent(self.symbol_container)
             button.setContextMenuPolicy(Qt.CustomContextMenu)
             button.customContextMenuRequested.connect(
@@ -1242,7 +2168,7 @@ class KaomojiWindow(QWidget):
         if 0x1400 <= cp <= 0x167F:
             return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Gadugi", "Segoe UI"], cp)
         if 0xA4D0 <= cp <= 0xA4FF:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "LXGW WenKai", "霞鹜文楷", "Segoe UI"], cp)
+            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "LXGW WenKai", "闇為箿鏂囨シ", "Segoe UI"], cp)
         if 0x1D00 <= cp <= 0x1D7F:
             return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial"], cp)
         if 0x2070 <= cp <= 0x209F:
@@ -1302,32 +2228,129 @@ class KaomojiWindow(QWidget):
         self._set_allow_activation(False)
         self.stack.setCurrentWidget(self.main_view)
 
-    def _update_hotkey(self):
-        hotkey = self.hotkey_edit.text().strip()
+    def _symbol_drag_payload(self, mime_data):
+        try:
+            raw = bytes(mime_data.data("application/x-kaomoji-symbol")).decode("utf-8")
+            payload = json.loads(raw)
+            return {
+                "group_index": int(payload["group_index"]),
+                "item_index": int(payload["item_index"]),
+                "symbol": str(payload.get("symbol", "")),
+            }
+        except Exception as exc:
+            log(f"Invalid symbol drag payload: {exc}")
+            return None
+
+    def _drop_symbol_on_group(self, mime_data, target_group_index):
+        payload = self._symbol_drag_payload(mime_data)
+        if not payload:
+            return False
+        if self.data.move_item_by_index(payload["group_index"], payload["item_index"], target_group_index, None):
+            self.current_group_index = target_group_index
+            QTimer.singleShot(0, self._reload_tabs)
+            return True
+        return False
+
+    def _drop_symbol_at(self, mime_data, pos):
+        payload = self._symbol_drag_payload(mime_data)
+        if not payload:
+            return False
+        target_index = self._symbol_insert_index_at(pos)
+        if self.data.move_item_by_index(
+            payload["group_index"],
+            payload["item_index"],
+            self.current_group_index,
+            target_index,
+        ):
+            QTimer.singleShot(0, self._render_symbols)
+            return True
+        return False
+
+    def _symbol_insert_index_at(self, pos):
+        buttons = sorted(
+            self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly),
+            key=lambda button: button.item_index,
+        )
+        for button in buttons:
+            rect = button.geometry()
+            if pos.y() < rect.center().y():
+                if pos.x() < rect.center().x() or pos.y() < rect.top():
+                    return button.item_index
+            if rect.top() <= pos.y() <= rect.bottom() and pos.x() < rect.center().x():
+                return button.item_index
+        return len(buttons)
+
+    def _symbol_insert_marker_rect(self, insert_index):
+        buttons = sorted(
+            self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly),
+            key=lambda button: button.item_index,
+        )
+        if not buttons:
+            return QRect(0, 0, 4, 44)
+
+        for button in buttons:
+            if insert_index <= button.item_index:
+                rect = button.geometry()
+                return QRect(max(0, rect.left() - 6), rect.top(), 4, rect.height())
+
+        rect = buttons[-1].geometry()
+        x = min(self.symbol_container.width() - 4, rect.right() + 8)
+        return QRect(max(0, x), rect.top(), 4, rect.height())
+
+    def _update_hotkey(self, hotkey=None):
+        hotkey = (hotkey or self.hotkey_edit.text()).strip()
         if hotkey:
-            self.config.set("hotkey", hotkey)
-            self.register_hotkey(hotkey)
+            try:
+                parse_hotkey(hotkey)
+            except ValueError as exc:
+                log(str(exc))
+                return
+            if self.register_hotkey(hotkey):
+                self.config.set("hotkey", hotkey)
 
     def _set_auto_start(self, enabled):
-        self.config.set("auto_start", bool(enabled))
         try:
-            import win32com.client
-            startup_path = os.path.join(
-                os.getenv("APPDATA"),
-                "Microsoft", "Windows", "Start Menu", "Programs", "Startup",
-                "KaomojiPicker.lnk",
-            )
-            if enabled:
-                shell = win32com.client.Dispatch("WScript.Shell")
-                shortcut = shell.CreateShortCut(startup_path)
-                shortcut.Targetpath = sys.executable
-                shortcut.Arguments = f'"{os.path.abspath(__file__)}"'
-                shortcut.WorkingDirectory = os.path.dirname(os.path.abspath(__file__))
-                shortcut.save()
-            elif os.path.exists(startup_path):
-                os.remove(startup_path)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
+                if enabled:
+                    winreg.SetValueEx(key, RUN_VALUE_NAME, 0, winreg.REG_SZ, self._auto_start_command())
+                else:
+                    try:
+                        winreg.DeleteValue(key, RUN_VALUE_NAME)
+                    except FileNotFoundError:
+                        pass
+            self.config.set("auto_start", bool(enabled))
         except Exception as exc:
-            print(f"Auto-start toggle failed: {exc}")
+            log(f"Auto-start toggle failed: {exc}")
+            self.autostart_check.blockSignals(True)
+            self.autostart_check.setChecked(self._is_auto_start_enabled())
+            self.autostart_check.blockSignals(False)
+            self._sync_autostart_state_label(self.autostart_check.isChecked())
+
+    def _sync_autostart_state_label(self, enabled):
+        if hasattr(self, "autostart_state"):
+            self.autostart_state.setText("已开启" if enabled else "已关闭")
+
+    def _auto_start_command(self):
+        if getattr(sys, "frozen", False):
+            return f'"{sys.executable}"'
+
+        executable = sys.executable
+        if os.path.basename(executable).lower() == "python.exe":
+            pythonw = os.path.join(os.path.dirname(executable), "pythonw.exe")
+            if os.path.exists(pythonw):
+                executable = pythonw
+        return f'"{executable}" "{os.path.abspath(__file__)}"'
+
+    def _is_auto_start_enabled(self):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY_PATH, 0, winreg.KEY_READ) as key:
+                value, _ = winreg.QueryValueEx(key, RUN_VALUE_NAME)
+            return value == self._auto_start_command()
+        except FileNotFoundError:
+            return False
+        except OSError as exc:
+            log(f"Auto-start read failed: {exc}")
+            return bool(self.config.get("auto_start", False))
 
     def _delete_symbol(self, symbol):
         groups = self.data.get_groups()
@@ -1377,6 +2400,7 @@ class KaomojiWindow(QWidget):
         names.insert(to_index, moved)
         self.data.reorder_groups(names)
         self.current_group_index = to_index
+        self.data.save()
 
     def _save_window_size(self):
         self.config.set("window_width", self.width())
@@ -1396,12 +2420,12 @@ class BaseDarkDialog(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setModal(True)
         self.setObjectName("darkDialog")
+        self.setAttribute(Qt.WA_StyledBackground, False)
         self.setStyleSheet(
             """
             QDialog#darkDialog {
-                background: rgba(12, 13, 22, 252);
-                border: 1px solid rgba(124, 111, 239, 0.34);
-                border-radius: 12px;
+                background: transparent;
+                border: none;
             }
             QLabel {
                 color: #e4e8f4;
@@ -1415,10 +2439,9 @@ class BaseDarkDialog(QDialog):
             }
             QLineEdit {
                 color: #edf1ff;
-                background: rgba(18, 19, 31, 245);
-                border: 1px solid rgba(124, 111, 239, 0.64);
-                border-radius: 9px;
-                padding: 8px;
+                background: transparent;
+                border: none;
+                padding: 0px;
                 selection-background-color: rgba(124, 111, 239, 0.55);
                 font-size: 14px;
             }
@@ -1427,24 +2450,35 @@ class BaseDarkDialog(QDialog):
                 min-height: 30px;
                 color: #e4e8f4;
                 background: transparent;
-                border: 1px solid transparent;
-                border-radius: 7px;
+                border: none;
                 padding: 4px 10px;
                 font-size: 13px;
             }
             QPushButton:hover {
-                background: rgba(255, 255, 255, 0.075);
-                border-color: rgba(255, 255, 255, 0.08);
+                background: transparent;
+                border: none;
             }
             QPushButton#primaryButton {
-                background: rgba(124, 111, 239, 0.24);
-                border-color: rgba(124, 111, 239, 0.44);
+                background: transparent;
+                border: none;
             }
             QPushButton#dangerButton {
-                background: rgba(240, 72, 72, 0.18);
-                border-color: rgba(240, 72, 72, 0.42);
+                background: transparent;
+                border: none;
             }
             """
+        )
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        draw_rounded_fill_box(
+            painter,
+            self.rect(),
+            12.0,
+            QColor(12, 13, 22, 252),
+            QColor(124, 111, 239, 87),
+            1.0,
         )
 
     def exec_with_activation(self):
@@ -1472,16 +2506,16 @@ class SimpleInputDialog(BaseDarkDialog):
         message = QLabel(label)
         layout.addWidget(message)
 
-        self.edit = QLineEdit()
+        self.edit = RoundedLineEdit()
         self.edit.setText(initial_text)
         self.edit.selectAll()
         layout.addWidget(self.edit)
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        ok_button = QPushButton("确定")
+        ok_button = RoundedButton("确定")
         ok_button.setObjectName("primaryButton")
-        cancel_button = QPushButton("取消")
+        cancel_button = RoundedButton("取消")
         ok_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
         buttons.addWidget(ok_button)
@@ -1514,9 +2548,9 @@ class ConfirmDialog(BaseDarkDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        confirm_button = QPushButton(confirm_text)
+        confirm_button = RoundedButton(confirm_text)
         confirm_button.setObjectName("dangerButton")
-        cancel_button = QPushButton(cancel_text)
+        cancel_button = RoundedButton(cancel_text)
         confirm_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
         buttons.addWidget(confirm_button)
@@ -1538,7 +2572,7 @@ class KaomojiApp(QApplication):
         self.setFont(QFont("Microsoft YaHei UI", 9))
         self.setQuitOnLastWindowClosed(False)
         self.window = KaomojiWindow()
-        self.window.register_hotkey(self.window.config.get("hotkey", "ctrl+`"))
+        self.window.register_hotkey(self.window.config.get("hotkey", "ctrl+q"))
         log("KaomojiApp ready")
         self.tray = self._create_tray()
         self.aboutToQuit.connect(self.window.unregister_hotkey)

@@ -1,8 +1,9 @@
 import json
 import os
+import sys
 
 DEFAULT_CONFIG = {
-    "hotkey": "ctrl+`",
+    "hotkey": "ctrl+q",
     "auto_start": False,
     "double_click_interval": 300,
     "window_width": 420,
@@ -13,7 +14,8 @@ DEFAULT_CONFIG = {
 class ConfigManager:
     def __init__(self, filepath=None):
         if filepath is None:
-            self.filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            self.filepath = os.path.join(base_dir, 'config.json')
         else:
             self.filepath = filepath
         self.config = self._load()

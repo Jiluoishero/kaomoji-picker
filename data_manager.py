@@ -105,6 +105,29 @@ class DataManager:
                 return True
         return False
 
+    def move_item(self, source_group_name, target_group_name, symbol):
+        if source_group_name == target_group_name:
+            return False
+
+        source_group = None
+        target_group = None
+        for group in self.data['groups']:
+            if group['name'] == source_group_name:
+                source_group = group
+            elif group['name'] == target_group_name:
+                target_group = group
+
+        if source_group is None or target_group is None:
+            return False
+
+        for index, item in enumerate(source_group.get('items', [])):
+            if item.get('symbol') == symbol:
+                moved_item = source_group['items'].pop(index)
+                target_group.setdefault('items', []).append(moved_item)
+                self.save()
+                return True
+        return False
+
     def add_group(self, name):
         for group in self.data['groups']:
             if group['name'] == name:

@@ -6,6 +6,7 @@ env/
 *.log
 app.log
 debug.log
+config.json
 dist/
 build/
 *.spec

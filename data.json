@@ -1,231 +1,283 @@
 {
   "groups": [
     {
-      "name": "开心",
+      "name": "颜文字",
       "items": [
         {
-          "symbol": "(・∀・)"
+          "symbol": "|∀ﾟ"
+        },
+        {
+          "symbol": "(´ﾟДﾟ`)"
+        },
+        {
+          "symbol": "(;´Д`)"
+        },
+        {
+          "symbol": "(｀･ω･)"
+        },
+        {
+          "symbol": "(=ﾟωﾟ)="
+        },
+        {
+          "symbol": "| ω・´)"
+        },
+        {
+          "symbol": "|-` )"
+        },
+        {
+          "symbol": "|д` )"
+        },
+        {
+          "symbol": "|ー` )"
+        },
+        {
+          "symbol": "|∀` )"
+        },
+        {
+          "symbol": "(つд⊂)"
+        },
+        {
+          "symbol": "(ﾟДﾟ≡ﾟДﾟ)"
+        },
+        {
+          "symbol": "(＾o＾)ﾉ"
+        },
+        {
+          "symbol": "( ﾟ∀ﾟ)"
         },
         {
           "symbol": "( ´∀`)"
         },
         {
-          "symbol": "(*´▽`*)"
+          "symbol": "(*´∀`)"
         },
         {
-          "symbol": "(◕‿◕✿)"
+          "symbol": "(*ﾟ∇ﾟ)"
         },
         {
-          "symbol": "ヽ(>∀<☆)ノ"
+          "symbol": "(*ﾟーﾟ)"
         },
         {
-          "symbol": "＼(＾▽＾)／"
+          "symbol": "( ﾟ 3ﾟ)"
         },
         {
-          "symbol": "(✿◠‿◠)"
+          "symbol": "( ´ー`)"
         },
         {
-          "symbol": "(*≧▽≦)"
+          "symbol": "( ・_ゝ・)"
         },
         {
-          "symbol": "(ﾉ◕ヮ◕)ﾉ*:・ﾟ✧"
+          "symbol": "( ´_ゝ`)"
         },
         {
-          "symbol": "(⌒‿⌒)"
+          "symbol": "(*´д`)"
         },
         {
-          "symbol": "٩(◕‿◕｡)۶"
+          "symbol": "(・ー・)"
         },
         {
-          "symbol": "(★‿★)"
-        }
-      ]
-    },
-    {
-      "name": "悲伤",
-      "items": [
+          "symbol": "(・∀・)"
+        },
         {
-          "symbol": "(;´Д`)"
+          "symbol": "(ゝ∀･)"
+        },
+        {
+          "symbol": "(〃∀〃)"
+        },
+        {
+          "symbol": "(ﾟ∀ﾟ)"
+        },
+        {
+          "symbol": "( ﾟ∀。)"
+        },
+        {
+          "symbol": "( `д´)"
+        },
+        {
+          "symbol": "(`ε´ )"
+        },
+        {
+          "symbol": "(`ヮ´ )"
+        },
+        {
+          "symbol": "σ`∀´)"
+        },
+        {
+          "symbol": "ﾟ∀ﾟ)σ"
+        },
+        {
+          "symbol": "ﾟ ∀ﾟ)ノ"
+        },
+        {
+          "symbol": "(╬ﾟдﾟ)"
+        },
+        {
+          "symbol": "(|||ﾟдﾟ)"
+        },
+        {
+          "symbol": "( ﾟдﾟ)"
+        },
+        {
+          "symbol": "Σ( ﾟдﾟ)"
+        },
+        {
+          "symbol": "( ;ﾟдﾟ)"
+        },
+        {
+          "symbol": "( ;´д`)"
+        },
+        {
+          "symbol": "( д ) ﾟ ﾟ"
+        },
+        {
+          "symbol": "( ☉д⊙)"
+        },
+        {
+          "symbol": "((( ﾟдﾟ)))"
+        },
+        {
+          "symbol": "( ` ・´)"
+        },
+        {
+          "symbol": "( ´д`)"
+        },
+        {
+          "symbol": "( -д-)"
+        },
+        {
+          "symbol": "(>д<)"
+        },
+        {
+          "symbol": "･ﾟ( ﾉд`ﾟ)"
         },
         {
           "symbol": "( TдT)"
         },
         {
-          "symbol": "(╥_╥)"
+          "symbol": "(￣∇￣)"
         },
         {
-          "symbol": "(;ω;)"
+          "symbol": "(￣3￣)"
         },
         {
-          "symbol": "(个_个)"
+          "symbol": "(￣ｰ￣)"
         },
         {
-          "symbol": "(´；ω；`)"
+          "symbol": "(￣ . ￣)"
         },
         {
-          "symbol": "(ノ_<。)"
+          "symbol": "(￣皿￣)"
         },
         {
-          "symbol": "(T_T)"
-        }
-      ]
-    },
-    {
-      "name": "可爱",
-      "items": [
-        {
-          "symbol": "(=^-ω-^=)"
+          "symbol": "(￣艸￣)"
         },
         {
-          "symbol": "(⁄ ⁄•⁄ω⁄•⁄ ⁄)"
+          "symbol": "(￣︿￣)"
         },
         {
-          "symbol": "(｡♥‿♥｡)"
+          "symbol": "(￣︶￣)"
         },
         {
-          "symbol": "ʕ•ᴥ•ʔ"
+          "symbol": "ヾ(´ωﾟ｀)"
         },
         {
-          "symbol": "(ᵔᴥᵔ)"
+          "symbol": "(´ω`)"
         },
         {
-          "symbol": "₍ᐢ..ᐢ₎"
+          "symbol": "(・ω・)"
         },
         {
-          "symbol": "꒰ᐢ. .ᐢ꒱"
+          "symbol": "( ´・ω)"
         },
         {
-          "symbol": "(◕ᴗ◕✿)"
+          "symbol": "(｀・ω)"
         },
         {
-          "symbol": "ᓚᘏᗢ"
+          "symbol": "(´・ω・`)"
         },
         {
-          "symbol": "( ˘ᴗ˘ )"
-        }
-      ]
-    },
-    {
-      "name": "动作",
-      "items": [
-        {
-          "symbol": "(╯°□°）╯︵ ┻━┻"
+          "symbol": "(`・ω・´)"
         },
         {
-          "symbol": "┬─┬ノ( º _ ºノ)"
+          "symbol": "( `_っ´)"
         },
         {
-          "symbol": "(ノ´ー`)ノ"
+          "symbol": "( `ー´)"
         },
         {
-          "symbol": "(ง •_•)ง"
+          "symbol": "( ´_っ`)"
         },
         {
-          "symbol": "( •̀ᄇ• ́)ﻭ✧"
+          "symbol": "( ´ρ`)"
         },
         {
-          "symbol": "(つ≧▽≦)つ"
+          "symbol": "( ﾟωﾟ)"
         },
         {
-          "symbol": "ヾ(⌐■_■)ノ♪"
+          "symbol": "(oﾟωﾟo)"
         },
         {
-          "symbol": "(ノ°∀°)ノ⌒・*:.。"
+          "symbol": "( ^ω^)"
         },
         {
-          "symbol": "_(┐「ε:)_"
+          "symbol": "ヾ(´ε`ヾ)"
         },
         {
-          "symbol": "(¬‿¬)"
-        }
-      ]
-    },
-    {
-      "name": "符号",
-      "items": [
-        {
-          "symbol": "★"
+          "symbol": "(ノﾟ∀ﾟ)ノ"
         },
         {
-          "symbol": "☆"
+          "symbol": "(σﾟдﾟ)σ"
         },
         {
-          "symbol": "♠"
+          "symbol": "(σﾟ∀ﾟ)σ"
         },
         {
-          "symbol": "♣"
+          "symbol": "|дﾟ )"
         },
         {
-          "symbol": "♥"
+          "symbol": "ﾟ(つд`ﾟ)"
         },
         {
-          "symbol": "♦"
+          "symbol": "ﾟÅﾟ )"
         },
         {
-          "symbol": "♪"
+          "symbol": "⊂彡☆))д`)"
         },
         {
-          "symbol": "♫"
+          "symbol": "⊂彡☆))д´)"
         },
         {
-          "symbol": "✿"
+          "symbol": "⊂彡☆))∀`)"
         },
         {
-          "symbol": "❀"
+          "symbol": "(´∀((☆ミつ"
         },
         {
-          "symbol": "✦"
+          "symbol": "･ﾟ( ﾉヮ´ )"
         },
         {
-          "symbol": "✧"
+          "symbol": "(ﾉ)`ω´(ヾ)"
         },
         {
-          "symbol": "⚡"
+          "symbol": "ᕕ( ᐛ )ᕗ"
         },
         {
-          "symbol": "☀"
+          "symbol": "( ˇωˇ)"
         },
         {
-          "symbol": "☁"
+          "symbol": "( ｣ﾟДﾟ)｣＜"
         },
         {
-          "symbol": "❄"
+          "symbol": "( ›´ω`‹ )"
         },
         {
-          "symbol": "→"
+          "symbol": "(;´ヮ`)7"
         },
         {
-          "symbol": "←"
+          "symbol": "(`ゥ´ )"
         },
         {
-          "symbol": "↑"
-        },
-        {
-          "symbol": "↓"
-        },
-        {
-          "symbol": "✓"
-        },
-        {
-          "symbol": "✗"
-        },
-        {
-          "symbol": "•"
-        },
-        {
-          "symbol": "◆"
-        },
-        {
-          "symbol": "※"
-        },
-        {
-          "symbol": "☾"
-        },
-        {
-          "symbol": "♬"
-        },
-        {
-          "symbol": "∞"
+          "symbol": "( ᑭ`д´)ᓀ))д´)ᑫ"
         }
       ]
     }

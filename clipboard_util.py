@@ -1,6 +1,7 @@
 import pyperclip
 import time
 import ctypes
+import win32clipboard
 import win32gui
 import win32con
 import win32api
@@ -18,7 +19,15 @@ class ClipboardUtil:
             self._saved_text = None
 
     def write_symbol(self, symbol):
-        pyperclip.copy(symbol)
+        try:
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, symbol)
+        finally:
+            try:
+                win32clipboard.CloseClipboard()
+            except Exception:
+                pass
 
     def restore_clipboard(self):
         if self._saved_text is not None:

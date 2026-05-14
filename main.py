@@ -34,23 +34,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app_logging import log
 from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
 from clipboard_util import ClipboardUtil
 from config_manager import ConfigManager
 from data_manager import DataManager
 from hotkey_parser import parse_hotkey
-
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_PATH = os.path.join(BASE_DIR, "debug.log")
-
-
-def log(message):
-    try:
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
-    except Exception:
-        pass
 
 
 MIN_WINDOW_WIDTH = 360

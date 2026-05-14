@@ -10,7 +10,7 @@ import win32con
 import win32gui
 import win32process
 from PySide6.QtCore import QEasingCurve, QEvent, QMimeData, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QColor, QCursor, QFont, QPainter, QRawFont
+from PySide6.QtGui import QColor, QCursor, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -33,6 +33,7 @@ from data_manager import DataManager
 from dialogs import ConfirmDialog, SimpleInputDialog
 from drag_widgets import SortableTabBar, SymbolContainer
 from flow_layout import FlowLayout
+from font_resolver import FontResolver
 from hotkey_edit import HotkeyEdit
 from hotkey_parser import parse_hotkey
 from resize_handle import ResizeHandle
@@ -107,19 +108,7 @@ class KaomojiWindow(QWidget):
         self.outside_timer = QTimer(self)
         self.outside_timer.timeout.connect(self._check_outside_click)
         self._outside_mouse_was_down = False
-        self.font_candidates = [
-            "Microsoft YaHei UI",
-            "Microsoft YaHei",
-            "Segoe UI",
-            "Arial",
-            "Segoe UI Symbol",
-            "Segoe UI Emoji",
-            "LXGW WenKai",
-            "闇為箿鏂囨シ",
-            "Gadugi",
-            "Cambria Math",
-        ]
-        self._font_support_cache = {}
+        self.font_resolver = FontResolver()
         self.show_animation = QPropertyAnimation(self, b"windowOpacity", self)
         self.show_animation.setDuration(120)
         self.show_animation.setEasingCurve(QEasingCurve.OutCubic)
@@ -1248,7 +1237,7 @@ class KaomojiWindow(QWidget):
         group = groups[self.current_group_index]
         for item_index, item in enumerate(group.get("items", [])):
             symbol = item["symbol"]
-            button = SymbolButton(symbol, self._font_for_char, self, self.current_group_index, item_index)
+            button = SymbolButton(symbol, self.font_resolver.font_for_char, self, self.current_group_index, item_index)
             button.setParent(self.symbol_container)
             button.setContextMenuPolicy(Qt.CustomContextMenu)
             button.customContextMenuRequested.connect(
@@ -1306,46 +1295,6 @@ class KaomojiWindow(QWidget):
         self.resize_animation.setStartValue(self.geometry())
         self.resize_animation.setEndValue(target)
         self.resize_animation.start()
-
-    def _font_for_char(self, ch):
-        cp = ord(ch)
-        if cp in self._font_support_cache:
-            return self._font_support_cache[cp]
-        preferred = self._preferred_font_for_codepoint(cp)
-        if preferred:
-            self._font_support_cache[cp] = preferred
-            return preferred
-        for family in self.font_candidates:
-            raw = QRawFont.fromFont(QFont(family, 12))
-            if raw.isValid() and raw.supportsCharacter(cp):
-                self._font_support_cache[cp] = family
-                return family
-        self._font_support_cache[cp] = "Microsoft YaHei UI"
-        return "Microsoft YaHei UI"
-
-    def _preferred_font_for_codepoint(self, cp):
-        # Some Windows fonts report broad fallback coverage through Qt, but still
-        # render tofu for uncommon kaomoji blocks. Prefer known-good fonts first.
-        if 0x1400 <= cp <= 0x167F:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Gadugi", "Segoe UI"], cp)
-        if 0xA4D0 <= cp <= 0xA4FF:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "LXGW WenKai", "闇為箿鏂囨シ", "Segoe UI"], cp)
-        if 0x1D00 <= cp <= 0x1D7F:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial"], cp)
-        if 0x2070 <= cp <= 0x209F:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Cambria Math", "Segoe UI"], cp)
-        if 0x0600 <= cp <= 0x06FF or 0xFE70 <= cp <= 0xFEFF:
-            return self._first_available_font(["Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Microsoft Uighur", "Arial"], cp)
-        if 0x2600 <= cp <= 0x27BF or 0x1F000 <= cp <= 0x1FAFF:
-            return self._first_available_font(["Segoe UI Emoji", "Segoe UI Symbol"], cp)
-        return None
-
-    def _first_available_font(self, families, cp):
-        for family in families:
-            raw = QRawFont.fromFont(QFont(family, 12))
-            if raw.isValid() and raw.supportsCharacter(cp):
-                return family
-        return None
 
     def _paste_symbol(self, symbol):
         if self.mode == "single":

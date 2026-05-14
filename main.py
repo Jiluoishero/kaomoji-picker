@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app_constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 from app_logging import log
 from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
 from clipboard_util import ClipboardUtil
@@ -42,11 +43,6 @@ from data_manager import DataManager
 from hotkey_parser import parse_hotkey
 from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
 
-
-MIN_WINDOW_WIDTH = 360
-MIN_WINDOW_HEIGHT = 320
-DEFAULT_WINDOW_WIDTH = 420
-DEFAULT_WINDOW_HEIGHT = 480
 
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012

@@ -5,6 +5,7 @@ import unittest
 
 import win32con
 
+from app_constants import DEFAULT_WINDOW_WIDTH
 from app_paths import runtime_file
 from config_manager import ConfigManager
 from data_manager import DataManager
@@ -46,7 +47,7 @@ class ManagerTests(unittest.TestCase):
             manager = ConfigManager(path)
 
             self.assertEqual(manager.get("hotkey"), "alt+q")
-            self.assertEqual(manager.get("window_width"), 420)
+            self.assertEqual(manager.get("window_width"), DEFAULT_WINDOW_WIDTH)
             self.assertTrue(os.path.exists(path))
 
     def test_data_manager_moves_items_by_index(self):

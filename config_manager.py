@@ -1,14 +1,15 @@
 import json
 import os
 
+from app_constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from app_paths import runtime_file
 
 DEFAULT_CONFIG = {
     "hotkey": "ctrl+q",
     "auto_start": False,
     "double_click_interval": 300,
-    "window_width": 420,
-    "window_height": 480
+    "window_width": DEFAULT_WINDOW_WIDTH,
+    "window_height": DEFAULT_WINDOW_HEIGHT
 }
 
 

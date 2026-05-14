@@ -13,7 +13,6 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
-    QLabel,
     QMenu,
     QStackedWidget,
     QVBoxLayout,
@@ -37,6 +36,7 @@ from rounded_widgets import RoundedFrame
 from settings_view import build_settings_view
 from symbol_drag import parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
 from symbol_button import SymbolButton
+from symbol_renderer import render_symbols
 from style_sheets import apply_window_styles
 from title_bar import TitleBar
 from win32_constants import (
@@ -658,59 +658,7 @@ class KaomojiWindow(QWidget):
             self.data_actions.add_group()
 
     def _render_symbols(self, generation=None):
-        if generation is not None and generation != self._layout_generation:
-            return
-        self._resize_render_pending = False
-        groups = self.data.get_groups()
-        for child in self.symbol_container.findChildren(QWidget, options=Qt.FindDirectChildrenOnly):
-            child.hide()
-            child.setParent(None)
-            child.deleteLater()
-
-        viewport_width = max(0, self.scroll.viewport().width())
-        self._last_render_width = viewport_width
-        self.symbol_container.setFixedWidth(viewport_width)
-        available_width = max(120, viewport_width - 2)
-        gap = self._scaled(10)
-        row_gap = self._scaled(10)
-        x = 0
-        y = 0
-        row_height = 0
-
-        if not groups:
-            label = QLabel("还没有分组", self.symbol_container)
-            label.setGeometry(0, 0, available_width, 32)
-            self.symbol_container.setMinimumHeight(40)
-            self._adjust_window_to_content(40)
-            return
-
-        group = groups[self.current_group_index]
-        for item_index, item in enumerate(group.get("items", [])):
-            symbol = item["symbol"]
-            button = SymbolButton(symbol, self.font_resolver.font_for_char, self, self.current_group_index, item_index)
-            button.setParent(self.symbol_container)
-            button.setContextMenuPolicy(Qt.CustomContextMenu)
-            button.customContextMenuRequested.connect(
-                lambda pos, b=button, s=symbol: self._show_symbol_context_menu(b, s, pos)
-            )
-            button.clicked.connect(lambda s=symbol: self._paste_symbol(s))
-
-            hint = button.sizeHint()
-            width = min(hint.width(), available_width)
-            height = hint.height()
-            if x > 0 and x + width > available_width:
-                x = 0
-                y += row_height + row_gap
-                row_height = 0
-            button.setGeometry(x, y, width, height)
-            button.show()
-            x += width + gap
-            row_height = max(row_height, height)
-
-        content_height = y + row_height
-        self.symbol_container.setMinimumHeight(max(1, content_height))
-        self.symbol_container.resize(viewport_width, max(1, content_height))
-        self._adjust_window_to_content(content_height)
+        render_symbols(self, generation)
 
     def _adjust_window_to_content(self, content_height):
         if self._manual_resize_active:

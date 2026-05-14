@@ -1,4 +1,4 @@
-﻿import ctypes
+import ctypes
 import json
 import os
 import sys
@@ -176,8 +176,8 @@ class HotkeyEdit(QLineEdit):
             background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
             border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
         else:
-            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
-            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 246, 252, 245)
+            border = QColor("#C67A25") if focused else QColor(195, 180, 210, 80)
         draw_rounded_fill_box(painter, self.rect(), 10.0, background, border, 1.0)
         painter.end()
         super().paintEvent(event)
@@ -410,7 +410,7 @@ class PinIcon(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(18, 18)
-        self._color = QColor("#8b5730")
+        self._color = QColor("#5A4E6B")
 
     def set_color(self, color):
         self._color = QColor(color)
@@ -433,12 +433,12 @@ class ThemeToggleButton(QToolButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._is_dark = False
-        self._color = QColor("#8b5730")
+        self._color = QColor("#5A4E6B")
         self.setText("")
 
     def set_theme(self, theme):
         self._is_dark = (theme == "dark")
-        self._color = QColor("#e4e0d0" if self._is_dark else "#8b5730")
+        self._color = QColor("#e4e0d0" if self._is_dark else "#5A4E6B")
         self.update()
 
     def paintEvent(self, event):
@@ -481,7 +481,7 @@ class SettingsButton(QToolButton):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._color = QColor("#8b5730")
+        self._color = QColor("#5A4E6B")
         self.setText("")
 
     def set_color(self, color):
@@ -565,7 +565,7 @@ class TitleBar(QFrame):
         self._apply_icon_colors(theme)
 
     def _apply_icon_colors(self, theme):
-        c = "#e4e0d0" if theme == "dark" else "#8b5730"
+        c = "#e4e0d0" if theme == "dark" else "#5A4E6B"
         self.pin_icon.set_color(c)
         self.settings_button.set_color(c)
         self.theme_button.set_theme(theme)
@@ -679,15 +679,15 @@ class RoundedFrame(QFrame):
                 gradient.setColorAt(0.5, QColor(20, 18, 46, 252))
                 gradient.setColorAt(1, QColor(13, 12, 28, 252))
                 return gradient, QColor(217, 179, 104, 64), 30.0, 1.0
-            return QColor(232, 228, 216, 250), QColor(103, 96, 78, 38), 30.0, 1.0
+            return QColor(250, 246, 252, 252), QColor(195, 180, 210, 60), 30.0, 1.0
         if self.role == "sortBar":
             if theme == "dark":
                 return QColor(22, 24, 46, 235), QColor(217, 179, 104, 64), 12.0, 1.0
-            return QColor(240, 236, 224, 235), QColor(103, 96, 78, 38), 12.0, 1.0
+            return QColor(245, 240, 248, 245), QColor(195, 180, 210, 50), 12.0, 1.0
         if self.role == "addBox":
             if theme == "dark":
                 return QColor(22, 24, 46, 235), QColor(217, 179, 104, 51), 12.0, 1.0
-            return QColor(240, 236, 224, 235), QColor(103, 96, 78, 31), 12.0, 1.0
+            return QColor(245, 240, 248, 245), QColor(195, 180, 210, 45), 12.0, 1.0
         return QColor(0, 0, 0, 0), QColor(0, 0, 0, 0), 0.0, 0.0
 
     def paintEvent(self, event):
@@ -722,9 +722,9 @@ class RoundedFrame(QFrame):
             title_gradient.setColorAt(1, QColor(255, 255, 255, 3))
             divider = QColor(217, 179, 104, 31)
         else:
-            title_gradient.setColorAt(0, QColor(255, 255, 255, 102))
-            title_gradient.setColorAt(1, QColor(255, 255, 255, 26))
-            divider = QColor(103, 96, 78, 20)
+            title_gradient.setColorAt(0, QColor(255, 255, 255, 140))
+            title_gradient.setColorAt(1, QColor(255, 255, 255, 40))
+            divider = QColor(195, 180, 210, 35)
         painter.fillRect(QRectF(0, 0, self.width(), title_h), title_gradient)
         painter.fillRect(QRectF(0, title_h - 1, self.width(), 1), divider)
         painter.restore()
@@ -755,8 +755,8 @@ class RoundedButton(QPushButton):
                 bg = QColor(217, 179, 104, 89 if hovered else 56)
                 border = QColor(217, 179, 104, 179 if hovered else 128)
             else:
-                bg = QColor(166, 98, 54, 56 if hovered else 31)
-                border = QColor(166, 98, 54, 140 if hovered else 89)
+                bg = QColor(198, 122, 37, 50 if hovered else 25)
+                border = QColor(198, 122, 37, 150 if hovered else 90)
             if pressed:
                 bg = bg.darker(110)
             return bg, border, 9.0, 1.0
@@ -765,8 +765,8 @@ class RoundedButton(QPushButton):
                 bg = QColor(217, 179, 104, 64 if pressed else 31)
                 border = QColor(217, 179, 104, 51)
             else:
-                bg = QColor(166, 98, 54, 38 if pressed else 20)
-                border = QColor(103, 96, 78, 31)
+                bg = QColor(198, 122, 37, 35 if pressed else 15)
+                border = QColor(195, 180, 210, 50)
             return bg, border, 9.0, 1.0
         return QColor(0, 0, 0, 0), QColor(0, 0, 0, 0), 9.0, 1.0
 
@@ -795,8 +795,8 @@ class RoundedLineEdit(QLineEdit):
             background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
             border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
         else:
-            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
-            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 246, 252, 245)
+            border = QColor("#C67A25") if focused else QColor(195, 180, 210, 80)
         return background, border
 
     def paintEvent(self, event):
@@ -822,8 +822,8 @@ class RoundedTextEdit(QTextEdit):
             background = QColor(16, 18, 34, 245) if focused else QColor(12, 14, 28, 235)
             border = QColor("#d9b368") if focused else QColor(217, 179, 104, 64)
         else:
-            background = QColor(255, 255, 255, 255) if focused else QColor(250, 248, 242, 245)
-            border = QColor("#a66236") if focused else QColor(103, 96, 78, 51)
+            background = QColor(255, 255, 255, 255) if focused else QColor(250, 246, 252, 245)
+            border = QColor("#C67A25") if focused else QColor(195, 180, 210, 80)
         return background, border
 
     def paintEvent(self, event):
@@ -854,9 +854,9 @@ class RoundedSwitch(QCheckBox):
             border = QColor("#d9b368") if checked or hovered else QColor(217, 179, 104, 77)
             knob = QColor(18, 19, 31, 245) if checked else QColor(217, 179, 104, 180)
         else:
-            background = QColor("#a66236") if checked else (QColor(255, 255, 255, 255) if hovered else QColor(250, 248, 242, 245))
-            border = QColor("#a66236") if checked or hovered else QColor(103, 96, 78, 64)
-            knob = QColor(255, 255, 255, 245) if checked else QColor(103, 96, 78, 150)
+            background = QColor("#C67A25") if checked else (QColor(255, 255, 255, 255) if hovered else QColor(250, 246, 252, 245))
+            border = QColor("#C67A25") if checked or hovered else QColor(195, 180, 210, 80)
+            knob = QColor(255, 255, 255, 245) if checked else QColor(195, 180, 210, 180)
 
         draw_rounded_fill_box(painter, QRectF(2, 1, 42, 24), 12.0, background, border, 1.0)
         knob_x = 24 if checked else 6
@@ -915,8 +915,8 @@ class SortableTabBar(QTabBar):
         painter.setRenderHint(QPainter.Antialiasing, True)
 
         theme = self.window.config.get("theme", "light") if self.window else "light"
-        indicator_color = QColor("#d9b368") if theme == "dark" else QColor("#a66236")
-        feedback_brush = QColor(217, 179, 104, 30) if theme == "dark" else QColor(166, 98, 54, 30)
+        indicator_color = QColor("#d9b368") if theme == "dark" else QColor("#C67A25")
+        feedback_brush = QColor(217, 179, 104, 30) if theme == "dark" else QColor(198, 122, 37, 30)
 
         # Draw the beautiful indicator with a dot break for the selected tab
         selected_index = self.currentIndex()
@@ -1070,7 +1070,7 @@ class SymbolButton(QFrame):
         if theme == "dark":
             text_color = QColor("#cca652") if is_pressed else (QColor("#d9b368") if is_hovered else QColor("#e4e8f4"))
         else:
-            text_color = QColor("#8a552e") if is_pressed else (QColor("#a66236") if is_hovered else QColor("#67604e"))
+            text_color = QColor("#A86015") if is_pressed else (QColor("#C67A25") if is_hovered else QColor("#5A4E6B"))
         for start, length, family in self.text_ranges:
             fmt = QTextCharFormat()
             font = QFont(family, self._font_size())
@@ -1120,16 +1120,16 @@ class SymbolButton(QFrame):
                 border_width = 1.0
         else:
             if is_pressed:
-                background = QColor(166, 98, 54, 31)
-                border = QColor("#a66236")
+                background = QColor(198, 122, 37, 30)
+                border = QColor("#C67A25")
                 border_width = 2.0
             elif is_hovered:
                 background = QColor(255, 255, 255, 255)
-                border = QColor(166, 98, 54, 102)
+                border = QColor(198, 122, 37, 120)
                 border_width = 2.0
             else:
-                background = QColor(250, 248, 242, 230)
-                border = QColor(103, 96, 78, 15)
+                background = QColor(255, 255, 255, 170)
+                border = QColor(195, 180, 210, 45)
                 border_width = 1.0
 
         return background, border, border_width
@@ -1866,12 +1866,12 @@ class KaomojiWindow(QWidget):
                 background: transparent;
                 border: none;
             }
-            #pinIcon { color: #8b5730; font-size: 14px; }
+            #pinIcon { color: #5A4E6B; font-size: 14px; }
             * { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
-            QLabel { color: #67604e; }
+            QLabel { color: #5A4E6B; }
             QToolButton {
                 background: transparent;
-                color: #67604e;
+                color: #5A4E6B;
                 border: 1px solid transparent;
                 border-radius: 9px;
                 padding: 5px 12px;
@@ -1880,24 +1880,24 @@ class KaomojiWindow(QWidget):
             }
             QPushButton {
                 background: transparent;
-                color: #67604e;
+                color: #5A4E6B;
                 border: none;
                 padding: 5px 12px;
                 font-size: 13px;
                 font-weight: 600;
             }
             QToolButton:hover {
-                background: rgba(103, 96, 78, 0.08);
+                background: rgba(198, 122, 37, 0.08);
                 border-color: transparent;
-                color: #a66236;
+                color: #C67A25;
             }
             QPushButton:hover {
                 background: transparent;
                 border: none;
-                color: #a66236;
+                color: #C67A25;
             }
             QToolButton:pressed {
-                background: rgba(166, 98, 54, 0.15);
+                background: rgba(198, 122, 37, 0.15);
             }
             QPushButton:pressed {
                 background: transparent;
@@ -1915,9 +1915,9 @@ class KaomojiWindow(QWidget):
                 padding: 0px;
                 font-size: 18px;
             }
-            QToolButton#closeButton:hover { background: #f04848; color: white; border-color: transparent; }
+            QToolButton#closeButton:hover { background: #e03030; color: white; border-color: transparent; }
             QTabBar::tab {
-                color: #9e9785;
+                color: #968C9E;
                 background: transparent;
                 padding: 8px 16px 12px 16px;
                 border-radius: 9px;
@@ -1927,11 +1927,11 @@ class KaomojiWindow(QWidget):
                 font-weight: 600;
             }
             QTabBar::tab:hover {
-                color: #a66236;
-                background: rgba(103, 96, 78, 0.05);
+                color: #C67A25;
+                background: rgba(198, 122, 37, 0.05);
             }
             QTabBar::tab:selected {
-                color: #8a552e;
+                color: #A86015;
                 background: transparent;
             }
             QScrollArea, QWidget { background: transparent; }
@@ -1941,12 +1941,12 @@ class KaomojiWindow(QWidget):
                 margin: 4px 1px 4px 1px;
             }
             QScrollBar::handle:vertical {
-                background: rgba(103, 96, 78, 0.18);
+                background: rgba(195, 180, 210, 0.35);
                 border-radius: 4px;
                 min-height: 24px;
             }
             QScrollBar::handle:vertical:hover {
-                background: rgba(103, 96, 78, 0.35);
+                background: rgba(195, 180, 210, 0.55);
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
@@ -1967,9 +1967,9 @@ class KaomojiWindow(QWidget):
                 background: transparent;
             }
             QMenu {
-                color: #67604e;
-                background-color: rgba(242, 239, 230, 252);
-                border: 1px solid rgba(103, 96, 78, 0.2);
+                color: #5A4E6B;
+                background-color: rgba(252, 250, 255, 252);
+                border: 1px solid rgba(195, 180, 210, 0.35);
                 border-radius: 12px;
                 padding: 6px;
                 font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
@@ -1977,22 +1977,22 @@ class KaomojiWindow(QWidget):
                 font-weight: 600;
             }
             QMenu::item {
-                color: #67604e;
+                color: #5A4E6B;
                 background: transparent;
                 padding: 8px 26px 8px 12px;
                 border-radius: 8px;
                 min-width: 150px;
             }
             QMenu::item:selected {
-                color: #a66236;
-                background: rgba(166, 98, 54, 0.1);
+                color: #C67A25;
+                background: rgba(198, 122, 37, 0.08);
             }
             QMenu::item:disabled {
-                color: rgba(103, 96, 78, 0.35);
+                color: rgba(195, 180, 210, 0.45);
             }
             QMenu::separator {
                 height: 1px;
-                background: rgba(103, 96, 78, 0.12);
+                background: rgba(195, 180, 210, 0.20);
                 margin: 5px 8px;
             }
             #symbolButton {
@@ -2014,7 +2014,7 @@ class KaomojiWindow(QWidget):
             QPushButton#primaryButton {
                 background: transparent;
                 border: none;
-                color: #a66236;
+                color: #C67A25;
             }
             QPushButton#primaryButton:hover {
                 background: transparent;
@@ -2025,7 +2025,7 @@ class KaomojiWindow(QWidget):
                 border: none;
             }
             QTextEdit, QLineEdit {
-                color: #67604e;
+                color: #5A4E6B;
                 background: transparent;
                 border: none;
                 padding: 0px;
@@ -2052,9 +2052,9 @@ class KaomojiWindow(QWidget):
                 background: transparent;
                 border: none;
             }
-            #settingsTitle { font-size: 16px; font-weight: 600; color: #a66236; }
-            #settingLabel { font-size: 14px; font-weight: 600; color: #67604e; }
-            #settingDesc { font-size: 12px; color: #8f8773; }
+            #settingsTitle { font-size: 16px; font-weight: 600; color: #C67A25; }
+            #settingLabel { font-size: 14px; font-weight: 600; color: #5A4E6B; }
+            #settingDesc { font-size: 12px; color: #968C9E; }
             """
         self.setStyleSheet(self._scale_qss(qss))
 

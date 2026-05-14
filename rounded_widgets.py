@@ -184,6 +184,18 @@ class RoundedSwitch(QCheckBox):
         self.setFixedSize(46, 26)
         self.setCursor(Qt.PointingHandCursor)
         self.setAttribute(Qt.WA_StyledBackground, False)
+        self.toggled.connect(self.update)
+
+    def hitButton(self, pos):
+        return self.rect().contains(pos)
+
+    def enterEvent(self, event):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
 
     def paintEvent(self, event):
         theme = window_theme(self)

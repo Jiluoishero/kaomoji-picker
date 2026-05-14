@@ -12,7 +12,7 @@ import win32api
 import win32con
 import win32gui
 import win32process
-from PySide6.QtCore import QEasingCurve, QMimeData, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal, QObject
+from PySide6.QtCore import QEasingCurve, QEvent, QMimeData, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QAction, QColor, QCursor, QDrag, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QRawFont, QTextCharFormat, QTextLayout
 from PySide6.QtWidgets import (
     QApplication,
@@ -59,9 +59,14 @@ DEFAULT_WINDOW_HEIGHT = 480
 
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
+WM_KEYDOWN = 0x0100
+WM_KEYUP = 0x0101
+WM_SYSKEYDOWN = 0x0104
+WM_SYSKEYUP = 0x0105
 WM_MOUSEACTIVATE = 0x0021
 MA_NOACTIVATE = 3
 PM_REMOVE = 0x0001
+WH_KEYBOARD_LL = 13
 GWL_EXSTYLE = -20
 GA_ROOT = 2
 WS_EX_TOOLWINDOW = 0x00000080
@@ -84,6 +89,20 @@ MOD_NOREPEAT = 0x4000
 HOTKEY_ID = 1
 RUN_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE_NAME = "KaomojiPicker"
+VK_TOP_ROW_DIGITS = tuple(range(0x31, 0x3A))
+VK_MODIFIERS = (
+    win32con.VK_CONTROL,
+    win32con.VK_LCONTROL,
+    win32con.VK_RCONTROL,
+    win32con.VK_MENU,
+    win32con.VK_LMENU,
+    win32con.VK_RMENU,
+    win32con.VK_SHIFT,
+    win32con.VK_LSHIFT,
+    win32con.VK_RSHIFT,
+    win32con.VK_LWIN,
+    win32con.VK_RWIN,
+)
 
 
 class MSG(ctypes.Structure):
@@ -95,6 +114,24 @@ class MSG(ctypes.Structure):
         ("time", ctypes.c_uint),
         ("pt", wintypes.POINT),
     ]
+
+
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [
+        ("vkCode", wintypes.DWORD),
+        ("scanCode", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_void_p),
+    ]
+
+
+LowLevelKeyboardProc = ctypes.WINFUNCTYPE(
+    ctypes.c_ssize_t,
+    ctypes.c_int,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+)
 
 
 class HotkeyBridge(QObject):
@@ -570,6 +607,7 @@ class ResizeHandle(QWidget):
     def mousePressEvent(self, event):
         if event.button() != Qt.LeftButton:
             return
+        self.window._begin_manual_resize()
         self.start_pos = event.globalPosition().toPoint()
         self.start_geometry = self.window.geometry()
         event.accept()
@@ -587,7 +625,7 @@ class ResizeHandle(QWidget):
     def mouseReleaseEvent(self, event):
         self.start_pos = None
         self.start_geometry = None
-        self.window._save_window_size()
+        self.window._finish_manual_resize()
         event.accept()
 
 
@@ -656,7 +694,40 @@ class RoundedFrame(QFrame):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
         background, border, radius, border_width = self._colors()
+        if self.role == "panel":
+            self._paint_panel(painter, background, border, radius, border_width)
+            return
         draw_rounded_fill_box(painter, self.rect(), radius, background, border, border_width)
+
+    def _paint_panel(self, painter, background, border, radius, border_width):
+        outer_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        inner_rect = outer_rect.adjusted(border_width, border_width, -border_width, -border_width)
+        inner_radius = max(0.0, radius - border_width)
+
+        outer_path = QPainterPath()
+        outer_path.addRoundedRect(outer_rect, radius, radius)
+        painter.fillPath(outer_path, border)
+
+        inner_path = QPainterPath()
+        inner_path.addRoundedRect(inner_rect, inner_radius, inner_radius)
+        painter.fillPath(inner_path, background)
+
+        painter.save()
+        painter.setClipPath(inner_path)
+        title_h = 40.0
+        theme = self.window.config.get("theme", "light") if self.window else window_theme(self)
+        title_gradient = QLinearGradient(0, 0, 0, title_h)
+        if theme == "dark":
+            title_gradient.setColorAt(0, QColor(255, 255, 255, 15))
+            title_gradient.setColorAt(1, QColor(255, 255, 255, 3))
+            divider = QColor(217, 179, 104, 31)
+        else:
+            title_gradient.setColorAt(0, QColor(255, 255, 255, 102))
+            title_gradient.setColorAt(1, QColor(255, 255, 255, 26))
+            divider = QColor(103, 96, 78, 20)
+        painter.fillRect(QRectF(0, 0, self.width(), title_h), title_gradient)
+        painter.fillRect(QRectF(0, title_h - 1, self.width(), 1), divider)
+        painter.restore()
 
 
 class RoundedButton(QPushButton):
@@ -943,9 +1014,10 @@ class SymbolButton(QFrame):
         self.setProperty("pressed", False)
         self.setAttribute(Qt.WA_StyledBackground, False)
 
-        width = self._measure_width(symbol, font_resolver) + 38
-        self.setMinimumWidth(max(42, width))
-        self.setMinimumHeight(44)
+        scale = self._scale()
+        width = self._measure_width(symbol, font_resolver) + int(38 * scale)
+        self.setMinimumWidth(max(int(42 * scale), width))
+        self.setMinimumHeight(max(36, int(44 * scale)))
 
     def sizeHint(self):
         return QSize(self.minimumWidth(), self.minimumHeight())
@@ -954,10 +1026,16 @@ class SymbolButton(QFrame):
         return self.sizeHint()
 
     def _base_font(self):
-        font = QFont("Microsoft YaHei UI", 12)
+        font = QFont("Microsoft YaHei UI", self._font_size())
         font.setHintingPreference(QFont.PreferNoHinting)
         font.setStyleStrategy(QFont.PreferAntialias)
         return font
+
+    def _scale(self):
+        return self.window.content_scale if self.window else 1.0
+
+    def _font_size(self):
+        return max(8, int(round(12 * self._scale())))
 
     def _text_ranges(self, text, font_resolver):
         ranges = []
@@ -995,7 +1073,7 @@ class SymbolButton(QFrame):
             text_color = QColor("#8a552e") if is_pressed else (QColor("#a66236") if is_hovered else QColor("#67604e"))
         for start, length, family in self.text_ranges:
             fmt = QTextCharFormat()
-            font = QFont(family, 12)
+            font = QFont(family, self._font_size())
             font.setHintingPreference(QFont.PreferNoHinting)
             font.setStyleStrategy(QFont.PreferAntialias)
             fmt.setFont(font)
@@ -1074,7 +1152,7 @@ class SymbolButton(QFrame):
         inner_path.addRoundedRect(inner_rect, inner_radius, inner_radius)
         painter.fillPath(inner_path, background)
 
-        layout, line = self._layout_text(max(1, self.width() - 12))
+        layout, line = self._layout_text(max(1, self.width() - int(12 * self._scale())))
         text_width = line.naturalTextWidth()
         text_height = line.height()
         x = max(0, (self.width() - text_width) / 2)
@@ -1143,6 +1221,8 @@ class SymbolButton(QFrame):
 
 
 class KaomojiWindow(QWidget):
+    digit_shortcut_pressed = Signal(int)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("颜文字输入器")
@@ -1156,6 +1236,12 @@ class KaomojiWindow(QWidget):
         self.allow_activation = False
         self.add_mode = False
         self.add_target_group = None
+        self.content_scale = float(self.config.get("content_scale", 1.0))
+        self.content_scale = min(1.5, max(0.75, self.content_scale))
+        self._keyboard_hook = None
+        self._keyboard_hook_proc = None
+        self._captured_digit_keys = set()
+        self.digit_shortcut_pressed.connect(self._switch_group_by_number)
         self.outside_timer = QTimer(self)
         self.outside_timer.timeout.connect(self._check_outside_click)
         self._outside_mouse_was_down = False
@@ -1175,6 +1261,17 @@ class KaomojiWindow(QWidget):
         self.show_animation = QPropertyAnimation(self, b"windowOpacity", self)
         self.show_animation.setDuration(120)
         self.show_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.resize_animation = QPropertyAnimation(self, b"geometry", self)
+        self.resize_animation.setDuration(180)
+        self.resize_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.resize_animation.finished.connect(self._on_resize_animation_finished)
+        self.base_window_size = QSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        self._auto_resize_active = False
+        self._manual_resize_active = False
+        self._resize_render_pending = False
+        self._suppress_resize_render = False
+        self._layout_generation = 0
+        self._last_render_width = -1
 
         flags = (
             Qt.Tool
@@ -1191,6 +1288,81 @@ class KaomojiWindow(QWidget):
         self._apply_styles()
         self._apply_window_activation_policy()
         self._apply_dwm_window_style()
+        QApplication.instance().installEventFilter(self)
+        self._install_keyboard_hook()
+
+    def _scaled(self, value):
+        return max(1, int(round(value * self.content_scale)))
+
+    def _scale_qss(self, qss):
+        for size in (11, 12, 13, 14, 15, 16, 18):
+            qss = qss.replace(f"font-size: {size}px;", f"font-size: {self._scaled(size)}px;")
+        return qss
+
+    def _install_keyboard_hook(self):
+        if sys.platform != "win32" or self._keyboard_hook:
+            return
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        user32.SetWindowsHookExW.restype = ctypes.c_void_p
+        user32.SetWindowsHookExW.argtypes = [ctypes.c_int, LowLevelKeyboardProc, ctypes.c_void_p, wintypes.DWORD]
+        user32.CallNextHookEx.restype = ctypes.c_ssize_t
+        user32.CallNextHookEx.argtypes = [ctypes.c_void_p, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
+        user32.UnhookWindowsHookEx.argtypes = [ctypes.c_void_p]
+        kernel32.GetModuleHandleW.restype = ctypes.c_void_p
+        kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+
+        def keyboard_proc(n_code, w_param, l_param):
+            if n_code == 0 and w_param in (WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP):
+                data = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                if data.vkCode in VK_TOP_ROW_DIGITS:
+                    if w_param in (WM_KEYUP, WM_SYSKEYUP):
+                        if data.vkCode in self._captured_digit_keys:
+                            self._captured_digit_keys.discard(data.vkCode)
+                            return 1
+                    elif self._should_capture_digit_shortcut():
+                        if data.vkCode not in self._captured_digit_keys:
+                            self._captured_digit_keys.add(data.vkCode)
+                            self.digit_shortcut_pressed.emit(data.vkCode - 0x30)
+                        return 1
+            return user32.CallNextHookEx(self._keyboard_hook, n_code, w_param, l_param)
+
+        self._keyboard_hook_proc = LowLevelKeyboardProc(keyboard_proc)
+        module = kernel32.GetModuleHandleW(None)
+        self._keyboard_hook = user32.SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            self._keyboard_hook_proc,
+            module,
+            0,
+        )
+        if not self._keyboard_hook:
+            self._keyboard_hook_proc = None
+            log(f"Failed to install digit keyboard hook error={ctypes.get_last_error()}")
+
+    def _uninstall_keyboard_hook(self):
+        if sys.platform != "win32" or not self._keyboard_hook:
+            return
+        try:
+            ctypes.windll.user32.UnhookWindowsHookEx(self._keyboard_hook)
+        except Exception as exc:
+            log(f"Failed to uninstall digit keyboard hook: {exc}")
+        self._keyboard_hook = None
+        self._keyboard_hook_proc = None
+        self._captured_digit_keys.clear()
+
+    def _should_capture_digit_shortcut(self):
+        if self.allow_activation or self.stack.currentWidget() != self.main_view:
+            return False
+        if not self.isVisible() or not self.geometry().contains(QCursor.pos()):
+            return False
+        return not any(win32api.GetAsyncKeyState(vk) & 0x8000 for vk in VK_MODIFIERS)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel and self.isVisible() and self.geometry().contains(QCursor.pos()):
+            self._handle_window_wheel(event)
+            return True
+        return super().eventFilter(obj, event)
 
     def nativeEvent(self, event_type, message):
         if sys.platform == "win32":
@@ -1333,6 +1505,7 @@ class KaomojiWindow(QWidget):
         width = min(max(MIN_WINDOW_WIDTH, width), max_width)
         height = min(max(MIN_WINDOW_HEIGHT, height), max_height)
         self.resize(width, height)
+        self.base_window_size = QSize(width, height)
         if width != self.config.get("window_width") or height != self.config.get("window_height"):
             self.config.set("window_width", width)
             self.config.set("window_height", height)
@@ -1421,7 +1594,7 @@ class KaomojiWindow(QWidget):
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.symbol_container = SymbolContainer(self)
         self.symbol_container.setMinimumHeight(1)
         self.scroll.setWidget(self.symbol_container)
@@ -1490,10 +1663,8 @@ class KaomojiWindow(QWidget):
                 border: none;
             }
             #titlebar {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(255, 255, 255, 0.06),
-                    stop:1 rgba(255, 255, 255, 0.01));
-                border-bottom: 1px solid rgba(217, 179, 104, 0.12);
+                background: transparent;
+                border: none;
             }
             #pinIcon { color: #e4e0d0; font-size: 14px; }
             * { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
@@ -1692,10 +1863,8 @@ class KaomojiWindow(QWidget):
                 border: none;
             }
             #titlebar {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(255, 255, 255, 0.4),
-                    stop:1 rgba(255, 255, 255, 0.1));
-                border-bottom: 1px solid rgba(103, 96, 78, 0.08);
+                background: transparent;
+                border: none;
             }
             #pinIcon { color: #8b5730; font-size: 14px; }
             * { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
@@ -1887,12 +2056,55 @@ class KaomojiWindow(QWidget):
             #settingLabel { font-size: 14px; font-weight: 600; color: #67604e; }
             #settingDesc { font-size: 12px; color: #8f8773; }
             """
-        self.setStyleSheet(qss)
+        self.setStyleSheet(self._scale_qss(qss))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._position_resize_handles()
-        QTimer.singleShot(0, self._render_symbols)
+        if self._manual_resize_active or self._suppress_resize_render:
+            return
+        width_changed = self.scroll.viewport().width() != self._last_render_width if hasattr(self, "scroll") else False
+        if not self._auto_resize_active or width_changed:
+            self._schedule_render_symbols()
+
+    def _schedule_render_symbols(self):
+        if self._resize_render_pending:
+            return
+        self._resize_render_pending = True
+        generation = self._layout_generation
+        QTimer.singleShot(0, lambda generation=generation: self._render_symbols(generation))
+
+    def _on_resize_animation_finished(self):
+        self._auto_resize_active = False
+        self._schedule_render_symbols()
+
+    def _cancel_auto_resize_work(self):
+        self._layout_generation += 1
+        self._resize_render_pending = False
+        self._auto_resize_active = False
+        self.resize_animation.stop()
+
+    def _restore_base_size(self):
+        if self.size() == self.base_window_size:
+            return
+        self._suppress_resize_render = True
+        try:
+            self.resize(self.base_window_size)
+        finally:
+            self._suppress_resize_render = False
+
+    def _begin_manual_resize(self):
+        self._manual_resize_active = True
+        self._auto_resize_active = False
+        self._resize_render_pending = False
+        self.resize_animation.stop()
+
+    def _finish_manual_resize(self):
+        self._manual_resize_active = False
+        self._auto_resize_active = False
+        self.base_window_size = self.size()
+        self._save_window_size()
+        self._schedule_render_symbols()
 
     def _position_resize_handles(self):
         if not hasattr(self, "resize_handles"):
@@ -1949,6 +2161,8 @@ class KaomojiWindow(QWidget):
         except Exception:
             self.prev_window_handle = None
 
+        self._cancel_auto_resize_work()
+        self._restore_base_size()
         self._reload_tabs(render=False)
         self.titlebar.set_mode(self.mode)
         self.stack.setCurrentWidget(self.main_view)
@@ -1956,9 +2170,15 @@ class KaomojiWindow(QWidget):
 
         cursor = QCursor.pos()
         geo = self._work_area_for_point(cursor)
-        x = min(max(cursor.x(), geo.left() + 10), geo.right() - self.width() - 10)
-        y = min(max(cursor.y(), geo.top() + 10), geo.bottom() - self.height() - 10)
-        self.move(x, y)
+        base_width = self.base_window_size.width()
+        base_height = self.base_window_size.height()
+        x = min(max(cursor.x(), geo.left() + 10), geo.right() - base_width - 10)
+        y = min(max(cursor.y(), geo.top() + 10), geo.bottom() - base_height - 10)
+        self._suppress_resize_render = True
+        try:
+            self.setGeometry(x, y, base_width, base_height)
+        finally:
+            self._suppress_resize_render = False
         self.setWindowOpacity(0.0)
         self.show()
         QApplication.processEvents()
@@ -1986,10 +2206,45 @@ class KaomojiWindow(QWidget):
         self.outside_timer.start(80)
         log(f"panel visible={self.isVisible()} hwnd={self._visible_panel_hwnd()}")
 
+    def _set_content_scale(self, scale):
+        scale = round(min(1.5, max(0.75, scale)), 2)
+        if abs(scale - self.content_scale) < 0.001:
+            return
+        self.content_scale = scale
+        self.config.set("content_scale", self.content_scale)
+        self._apply_styles()
+        self._render_symbols()
+
+    def _handle_window_wheel(self, event):
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return
+        if event.modifiers() & Qt.ControlModifier:
+            step = 0.1 if delta > 0 else -0.1
+            self._set_content_scale(self.content_scale + step)
+            event.accept()
+            return
+        self._switch_group_by_delta(-1 if delta > 0 else 1)
+        event.accept()
+
+    def _switch_group_by_delta(self, delta):
+        count = self.tabs.count() if hasattr(self, "tabs") else 0
+        if count <= 0:
+            return
+        index = (self.current_group_index + delta) % count
+        self.tabs.setCurrentIndex(index)
+
+    def _switch_group_by_number(self, number):
+        index = number - 1
+        if hasattr(self, "tabs") and 0 <= index < self.tabs.count():
+            self.tabs.setCurrentIndex(index)
+
     def hide_panel(self):
         self._save_window_size()
+        self._cancel_auto_resize_work()
         self.outside_timer.stop()
         self.hide()
+        self._restore_base_size()
 
     def _work_area_for_point(self, point):
         screen = QApplication.screenAt(point) or QApplication.primaryScreen()
@@ -2097,7 +2352,10 @@ class KaomojiWindow(QWidget):
         elif action == add_group_action:
             self._add_group()
 
-    def _render_symbols(self):
+    def _render_symbols(self, generation=None):
+        if generation is not None and generation != self._layout_generation:
+            return
+        self._resize_render_pending = False
         groups = self.data.get_groups()
         for child in self.symbol_container.findChildren(QWidget, options=Qt.FindDirectChildrenOnly):
             child.hide()
@@ -2105,10 +2363,11 @@ class KaomojiWindow(QWidget):
             child.deleteLater()
 
         viewport_width = max(0, self.scroll.viewport().width())
+        self._last_render_width = viewport_width
         self.symbol_container.setFixedWidth(viewport_width)
         available_width = max(120, viewport_width - 2)
-        gap = 10
-        row_gap = 10
+        gap = self._scaled(10)
+        row_gap = self._scaled(10)
         x = 0
         y = 0
         row_height = 0
@@ -2117,6 +2376,7 @@ class KaomojiWindow(QWidget):
             label = QLabel("还没有分组", self.symbol_container)
             label.setGeometry(0, 0, available_width, 32)
             self.symbol_container.setMinimumHeight(40)
+            self._adjust_window_to_content(40)
             return
 
         group = groups[self.current_group_index]
@@ -2145,6 +2405,41 @@ class KaomojiWindow(QWidget):
         content_height = y + row_height
         self.symbol_container.setMinimumHeight(max(1, content_height))
         self.symbol_container.resize(viewport_width, max(1, content_height))
+        self._adjust_window_to_content(content_height)
+
+    def _adjust_window_to_content(self, content_height):
+        if self._manual_resize_active:
+            return
+        if not hasattr(self, "scroll") or self.stack.currentWidget() != self.main_view:
+            return
+        base_width = max(MIN_WINDOW_WIDTH, self.base_window_size.width())
+        base_height = max(MIN_WINDOW_HEIGHT, self.base_window_size.height())
+        non_scroll_height = max(0, self.height() - self.scroll.viewport().height())
+        needed_height = max(base_height, non_scroll_height + max(1, content_height))
+
+        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
+        if screen:
+            area = screen.availableGeometry()
+            max_height = max(MIN_WINDOW_HEIGHT, area.height() - 20)
+        else:
+            area = None
+            max_height = 900
+        target_height = min(needed_height, max_height)
+        target_width = max(base_width, self.width())
+        if abs(target_height - self.height()) < 2 and target_width == self.width():
+            return
+
+        target = QRect(self.x(), self.y(), target_width, int(target_height))
+        if area and target.bottom() > area.bottom() - 10:
+            target.moveBottom(area.bottom() - 10)
+        if area and target.top() < area.top() + 10:
+            target.moveTop(area.top() + 10)
+
+        self._auto_resize_active = True
+        self.resize_animation.stop()
+        self.resize_animation.setStartValue(self.geometry())
+        self.resize_animation.setEndValue(target)
+        self.resize_animation.start()
 
     def _font_for_char(self, ch):
         cp = ord(ch)
@@ -2403,11 +2698,12 @@ class KaomojiWindow(QWidget):
         self.data.save()
 
     def _save_window_size(self):
-        self.config.set("window_width", self.width())
-        self.config.set("window_height", self.height())
+        self.config.set("window_width", self.base_window_size.width())
+        self.config.set("window_height", self.base_window_size.height())
 
     def closeEvent(self, event):
         self.unregister_hotkey()
+        self._uninstall_keyboard_hook()
         self._save_window_size()
         super().closeEvent(event)
 
@@ -2576,6 +2872,7 @@ class KaomojiApp(QApplication):
         log("KaomojiApp ready")
         self.tray = self._create_tray()
         self.aboutToQuit.connect(self.window.unregister_hotkey)
+        self.aboutToQuit.connect(self.window._uninstall_keyboard_hook)
 
     def _create_tray(self):
         tray = QSystemTrayIcon(self._tray_icon(), self)

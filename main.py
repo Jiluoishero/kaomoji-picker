@@ -1008,13 +1008,7 @@ class KaomojiWindow(QWidget):
     def _set_auto_start(self, enabled):
         try:
             set_auto_start_enabled(enabled, __file__)
-            current = self._is_auto_start_enabled()
-            self.autostart_check.blockSignals(True)
-            self.autostart_check.setChecked(current)
-            self.autostart_check.blockSignals(False)
-            self._sync_autostart_state_label(current)
-            self.config.set("auto_start", current)
-            log(f"Auto-start set requested={bool(enabled)} actual={current}")
+            self.config.set("auto_start", bool(enabled))
         except Exception as exc:
             log(f"Auto-start toggle failed: {exc}")
             self.autostart_check.blockSignals(True)

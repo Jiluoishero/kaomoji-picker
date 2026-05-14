@@ -41,46 +41,32 @@ from rounded_widgets import RoundedButton, RoundedFrame, RoundedLineEdit, Rounde
 from symbol_button import SymbolButton
 from title_bar import TitleBar
 from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
-from win32_types import KBDLLHOOKSTRUCT, LowLevelKeyboardProc
-
-
-WM_HOTKEY = 0x0312
-WM_KEYDOWN = 0x0100
-WM_KEYUP = 0x0101
-WM_SYSKEYDOWN = 0x0104
-WM_SYSKEYUP = 0x0105
-WM_MOUSEACTIVATE = 0x0021
-MA_NOACTIVATE = 3
-WH_KEYBOARD_LL = 13
-GWL_EXSTYLE = -20
-GA_ROOT = 2
-WS_EX_TOOLWINDOW = 0x00000080
-WS_EX_APPWINDOW = 0x00040000
-WS_EX_NOACTIVATE = 0x08000000
-SW_SHOWNOACTIVATE = 4
-SWP_NOMOVE = 0x0001
-SWP_NOSIZE = 0x0002
-SWP_NOACTIVATE = 0x0010
-SWP_SHOWWINDOW = 0x0040
-DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-DWMWA_WINDOW_CORNER_PREFERENCE = 33
-DWMWCP_ROUND = 2
-DWMWCP_DONOTROUND = 1
-HOTKEY_ID = 1
-VK_TOP_ROW_DIGITS = tuple(range(0x31, 0x3A))
-VK_MODIFIERS = (
-    win32con.VK_CONTROL,
-    win32con.VK_LCONTROL,
-    win32con.VK_RCONTROL,
-    win32con.VK_MENU,
-    win32con.VK_LMENU,
-    win32con.VK_RMENU,
-    win32con.VK_SHIFT,
-    win32con.VK_LSHIFT,
-    win32con.VK_RSHIFT,
-    win32con.VK_LWIN,
-    win32con.VK_RWIN,
+from win32_constants import (
+    DWMWA_WINDOW_CORNER_PREFERENCE,
+    DWMWCP_DONOTROUND,
+    GA_ROOT,
+    GWL_EXSTYLE,
+    HOTKEY_ID,
+    MA_NOACTIVATE,
+    SWP_NOACTIVATE,
+    SWP_NOMOVE,
+    SWP_NOSIZE,
+    SWP_SHOWWINDOW,
+    SW_SHOWNOACTIVATE,
+    VK_MODIFIERS,
+    VK_TOP_ROW_DIGITS,
+    WH_KEYBOARD_LL,
+    WM_HOTKEY,
+    WM_KEYDOWN,
+    WM_KEYUP,
+    WM_MOUSEACTIVATE,
+    WM_SYSKEYDOWN,
+    WM_SYSKEYUP,
+    WS_EX_APPWINDOW,
+    WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
 )
+from win32_types import KBDLLHOOKSTRUCT, LowLevelKeyboardProc
 
 
 class KaomojiWindow(QWidget):

@@ -4,8 +4,9 @@ import tempfile
 import unittest
 
 import win32con
+from PySide6.QtCore import QPoint, QRect
 
-from app_constants import DEFAULT_WINDOW_WIDTH
+from app_constants import DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 from app_paths import runtime_file
 from config_manager import ConfigManager
 from data_manager import DataManager
@@ -17,6 +18,7 @@ from hotkey_parser import (
     MOD_WIN,
     parse_hotkey,
 )
+from resize_geometry import resize_handle_geometries, resized_window_geometry
 
 
 class HotkeyParserTests(unittest.TestCase):
@@ -68,6 +70,22 @@ class ManagerTests(unittest.TestCase):
             self.assertTrue(moved)
             self.assertEqual([item["symbol"] for item in manager.get_groups()[0]["items"]], ["1"])
             self.assertEqual([item["symbol"] for item in manager.get_groups()[1]["items"]], ["2", "3"])
+
+
+class ResizeGeometryTests(unittest.TestCase):
+    def test_resized_window_geometry_expands_from_south_east(self):
+        result = resized_window_geometry("se", QRect(10, 20, 400, 350), QPoint(30, 40))
+        self.assertEqual(result, QRect(10, 20, 430, 390))
+
+    def test_resized_window_geometry_clamps_from_north_west(self):
+        result = resized_window_geometry("nw", QRect(100, 120, 380, 340), QPoint(100, 80))
+        self.assertEqual(result, QRect(100 + 380 - MIN_WINDOW_WIDTH, 120 + 340 - MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT))
+
+    def test_resize_handle_geometries_cover_all_handles(self):
+        geometries = resize_handle_geometries(400, 360)
+        self.assertEqual(set(geometries), {"n", "s", "e", "w", "ne", "se", "sw", "nw"})
+        self.assertEqual(geometries["n"], QRect(16, 8, 368, 8))
+        self.assertEqual(geometries["se"], QRect(376, 336, 16, 16))
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from flow_layout import FlowLayout
 from font_resolver import FontResolver
 from hotkey_parser import parse_hotkey
 from main_view import build_main_view
+from resize_geometry import resize_handle_geometries, resized_window_geometry
 from resize_handle import ResizeHandle
 from rounded_widgets import RoundedFrame
 from settings_view import build_settings_view
@@ -451,50 +452,13 @@ class KaomojiWindow(QWidget):
     def _position_resize_handles(self):
         if not hasattr(self, "resize_handles"):
             return
-        edge = 8
-        corner = 16
-        w = self.width()
-        h = self.height()
-        inset = 8
-        self.resize_handles["n"].setGeometry(corner, inset, max(0, w - corner * 2), edge)
-        self.resize_handles["s"].setGeometry(corner, h - inset - edge, max(0, w - corner * 2), edge)
-        self.resize_handles["e"].setGeometry(w - inset - edge, corner, edge, max(0, h - corner * 2))
-        self.resize_handles["w"].setGeometry(inset, corner, edge, max(0, h - corner * 2))
-        self.resize_handles["ne"].setGeometry(w - inset - corner, inset, corner, corner)
-        self.resize_handles["se"].setGeometry(w - inset - corner, h - inset - corner, corner, corner)
-        self.resize_handles["sw"].setGeometry(inset, h - inset - corner, corner, corner)
-        self.resize_handles["nw"].setGeometry(inset, inset, corner, corner)
-        for handle in self.resize_handles.values():
+        geometries = resize_handle_geometries(self.width(), self.height())
+        for direction, handle in self.resize_handles.items():
+            handle.setGeometry(geometries[direction])
             handle.raise_()
 
     def resize_from_handle(self, direction, start_geometry, delta):
-        x = start_geometry.x()
-        y = start_geometry.y()
-        width = start_geometry.width()
-        height = start_geometry.height()
-        dx = delta.x()
-        dy = delta.y()
-
-        if "e" in direction:
-            width += dx
-        if "s" in direction:
-            height += dy
-        if "w" in direction:
-            x += dx
-            width -= dx
-            if width < MIN_WINDOW_WIDTH:
-                x -= MIN_WINDOW_WIDTH - width
-                width = MIN_WINDOW_WIDTH
-        if "n" in direction:
-            y += dy
-            height -= dy
-            if height < MIN_WINDOW_HEIGHT:
-                y -= MIN_WINDOW_HEIGHT - height
-                height = MIN_WINDOW_HEIGHT
-
-        width = max(MIN_WINDOW_WIDTH, width)
-        height = max(MIN_WINDOW_HEIGHT, height)
-        self.setGeometry(x, y, width, height)
+        self.setGeometry(resized_window_geometry(direction, start_geometry, delta))
 
     def show_panel(self):
         log("show_panel")

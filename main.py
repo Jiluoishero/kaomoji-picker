@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 from app_constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 from app_shell import KaomojiApp
 from app_logging import log
-from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
 from clipboard_util import ClipboardUtil
 from data_actions import DataActionController
 from config_manager import ConfigManager
@@ -33,6 +32,12 @@ from main_view import build_main_view
 from resize_geometry import resize_handle_geometries, resized_window_geometry
 from resize_handle import ResizeHandle
 from rounded_widgets import RoundedFrame
+from settings_actions import (
+    is_auto_start,
+    set_auto_start,
+    sync_autostart_state_label,
+    update_hotkey,
+)
 from settings_view import build_settings_view
 from symbol_drag import parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
 from symbol_button import SymbolButton
@@ -777,37 +782,16 @@ class KaomojiWindow(QWidget):
         return symbol_insert_marker_rect(insert_index, buttons, self.symbol_container.width())
 
     def _update_hotkey(self, hotkey=None):
-        hotkey = (hotkey or self.hotkey_edit.text()).strip()
-        if hotkey:
-            try:
-                parse_hotkey(hotkey)
-            except ValueError as exc:
-                log(str(exc))
-                return
-            if self.register_hotkey(hotkey):
-                self.config.set("hotkey", hotkey)
+        update_hotkey(self, hotkey)
 
     def _set_auto_start(self, enabled):
-        try:
-            set_auto_start_enabled(enabled, __file__)
-            self.config.set("auto_start", bool(enabled))
-        except Exception as exc:
-            log(f"Auto-start toggle failed: {exc}")
-            self.autostart_check.blockSignals(True)
-            self.autostart_check.setChecked(self._is_auto_start_enabled())
-            self.autostart_check.blockSignals(False)
-            self._sync_autostart_state_label(self.autostart_check.isChecked())
+        set_auto_start(self, enabled, __file__)
 
     def _sync_autostart_state_label(self, enabled):
-        if hasattr(self, "autostart_state"):
-            self.autostart_state.setText("已开启" if enabled else "已关闭")
+        sync_autostart_state_label(self, enabled)
 
     def _is_auto_start_enabled(self):
-        try:
-            return is_auto_start_enabled(__file__)
-        except OSError as exc:
-            log(f"Auto-start read failed: {exc}")
-            return bool(self.config.get("auto_start", False))
+        return is_auto_start(self, __file__)
 
     def _save_window_size(self):
         self.config.set("window_width", self.base_window_size.width())

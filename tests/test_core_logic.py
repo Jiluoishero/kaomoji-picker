@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 import win32con
-from PySide6.QtCore import QPoint, QRect
+from PySide6.QtCore import QByteArray, QMimeData, QPoint, QRect
 
 from app_constants import DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 from app_paths import runtime_file
@@ -19,6 +19,16 @@ from hotkey_parser import (
     parse_hotkey,
 )
 from resize_geometry import resize_handle_geometries, resized_window_geometry
+from symbol_drag import SYMBOL_MIME_TYPE, parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
+
+
+class FakeButton:
+    def __init__(self, item_index, rect):
+        self.item_index = item_index
+        self._rect = rect
+
+    def geometry(self):
+        return self._rect
 
 
 class HotkeyParserTests(unittest.TestCase):
@@ -86,6 +96,35 @@ class ResizeGeometryTests(unittest.TestCase):
         self.assertEqual(set(geometries), {"n", "s", "e", "w", "ne", "se", "sw", "nw"})
         self.assertEqual(geometries["n"], QRect(16, 8, 368, 8))
         self.assertEqual(geometries["se"], QRect(376, 336, 16, 16))
+
+
+class SymbolDragTests(unittest.TestCase):
+    def test_parse_symbol_drag_payload_normalizes_types(self):
+        mime_data = QMimeData()
+        mime_data.setData(SYMBOL_MIME_TYPE, QByteArray(b'{"group_index":"1","item_index":"2","symbol":123}'))
+
+        self.assertEqual(
+            parse_symbol_drag_payload(mime_data),
+            {"group_index": 1, "item_index": 2, "symbol": "123"},
+        )
+
+    def test_symbol_insert_index_uses_button_geometry(self):
+        buttons = [
+            FakeButton(0, QRect(0, 0, 40, 30)),
+            FakeButton(1, QRect(50, 0, 40, 30)),
+        ]
+
+        self.assertEqual(symbol_insert_index_at(QPoint(45, 10), buttons), 1)
+        self.assertEqual(symbol_insert_index_at(QPoint(120, 10), buttons), 2)
+
+    def test_symbol_insert_marker_rect_uses_target_or_tail(self):
+        buttons = [
+            FakeButton(0, QRect(0, 0, 40, 30)),
+            FakeButton(1, QRect(50, 0, 40, 30)),
+        ]
+
+        self.assertEqual(symbol_insert_marker_rect(1, buttons, 120), QRect(44, 0, 4, 30))
+        self.assertEqual(symbol_insert_marker_rect(2, buttons, 120), QRect(97, 0, 4, 30))
 
 
 if __name__ == "__main__":

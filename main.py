@@ -1,5 +1,4 @@
 import ctypes
-import json
 import os
 import sys
 import time
@@ -9,8 +8,8 @@ import win32api
 import win32con
 import win32gui
 import win32process
-from PySide6.QtCore import QEasingCurve, QEvent, QMimeData, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QColor, QCursor, QPainter
+from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -29,7 +28,6 @@ from clipboard_util import ClipboardUtil
 from data_actions import DataActionController
 from config_manager import ConfigManager
 from data_manager import DataManager
-from flow_layout import FlowLayout
 from font_resolver import FontResolver
 from hotkey_parser import parse_hotkey
 from main_view import build_main_view
@@ -37,10 +35,10 @@ from resize_geometry import resize_handle_geometries, resized_window_geometry
 from resize_handle import ResizeHandle
 from rounded_widgets import RoundedFrame
 from settings_view import build_settings_view
+from symbol_drag import parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
 from symbol_button import SymbolButton
 from style_sheets import apply_window_styles
 from title_bar import TitleBar
-from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
 from win32_constants import (
     DWMWA_WINDOW_CORNER_PREFERENCE,
     DWMWCP_DONOTROUND,
@@ -792,13 +790,7 @@ class KaomojiWindow(QWidget):
 
     def _symbol_drag_payload(self, mime_data):
         try:
-            raw = bytes(mime_data.data("application/x-kaomoji-symbol")).decode("utf-8")
-            payload = json.loads(raw)
-            return {
-                "group_index": int(payload["group_index"]),
-                "item_index": int(payload["item_index"]),
-                "symbol": str(payload.get("symbol", "")),
-            }
+            return parse_symbol_drag_payload(mime_data)
         except Exception as exc:
             log(f"Invalid symbol drag payload: {exc}")
             return None
@@ -829,35 +821,12 @@ class KaomojiWindow(QWidget):
         return False
 
     def _symbol_insert_index_at(self, pos):
-        buttons = sorted(
-            self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly),
-            key=lambda button: button.item_index,
-        )
-        for button in buttons:
-            rect = button.geometry()
-            if pos.y() < rect.center().y():
-                if pos.x() < rect.center().x() or pos.y() < rect.top():
-                    return button.item_index
-            if rect.top() <= pos.y() <= rect.bottom() and pos.x() < rect.center().x():
-                return button.item_index
-        return len(buttons)
+        buttons = self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly)
+        return symbol_insert_index_at(pos, buttons)
 
     def _symbol_insert_marker_rect(self, insert_index):
-        buttons = sorted(
-            self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly),
-            key=lambda button: button.item_index,
-        )
-        if not buttons:
-            return QRect(0, 0, 4, 44)
-
-        for button in buttons:
-            if insert_index <= button.item_index:
-                rect = button.geometry()
-                return QRect(max(0, rect.left() - 6), rect.top(), 4, rect.height())
-
-        rect = buttons[-1].geometry()
-        x = min(self.symbol_container.width() - 4, rect.right() + 8)
-        return QRect(max(0, x), rect.top(), 4, rect.height())
+        buttons = self.symbol_container.findChildren(SymbolButton, options=Qt.FindDirectChildrenOnly)
+        return symbol_insert_marker_rect(insert_index, buttons, self.symbol_container.width())
 
     def _update_hotkey(self, hotkey=None):
         hotkey = (hotkey or self.hotkey_edit.text()).strip()

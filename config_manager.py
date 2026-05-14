@@ -1,6 +1,7 @@
 import json
 import os
-import sys
+
+from app_paths import runtime_file
 
 DEFAULT_CONFIG = {
     "hotkey": "ctrl+q",
@@ -14,8 +15,7 @@ DEFAULT_CONFIG = {
 class ConfigManager:
     def __init__(self, filepath=None):
         if filepath is None:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            self.filepath = os.path.join(base_dir, 'config.json')
+            self.filepath = runtime_file(__file__, 'config.json')
         else:
             self.filepath = filepath
         self.config = self._load()

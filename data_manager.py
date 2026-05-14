@@ -1,6 +1,7 @@
 import json
 import os
-import sys
+
+from app_paths import runtime_file
 
 DEFAULT_DATA = {
     "groups": [
@@ -59,8 +60,7 @@ DEFAULT_DATA = {
 class DataManager:
     def __init__(self, filepath=None):
         if filepath is None:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            self.filepath = os.path.join(base_dir, 'data.json')
+            self.filepath = runtime_file(__file__, 'data.json')
         else:
             self.filepath = filepath
         self.data = self._load()

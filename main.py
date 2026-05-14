@@ -40,6 +40,7 @@ from rounded_widgets import RoundedButton, RoundedFrame, RoundedLineEdit, Rounde
 from symbol_button import SymbolButton
 from title_bar import TitleBar
 from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
+from win32_types import KBDLLHOOKSTRUCT, LowLevelKeyboardProc
 
 
 WM_HOTKEY = 0x0312
@@ -78,24 +79,6 @@ VK_MODIFIERS = (
     win32con.VK_RSHIFT,
     win32con.VK_LWIN,
     win32con.VK_RWIN,
-)
-
-
-class KBDLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("vkCode", wintypes.DWORD),
-        ("scanCode", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.c_void_p),
-    ]
-
-
-LowLevelKeyboardProc = ctypes.WINFUNCTYPE(
-    ctypes.c_ssize_t,
-    ctypes.c_int,
-    wintypes.WPARAM,
-    wintypes.LPARAM,
 )
 
 

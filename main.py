@@ -34,10 +34,10 @@ from data_manager import DataManager
 from drag_widgets import SortableTabBar, SymbolContainer
 from flow_layout import FlowLayout
 from font_resolver import FontResolver
-from hotkey_edit import HotkeyEdit
 from hotkey_parser import parse_hotkey
 from resize_handle import ResizeHandle
-from rounded_widgets import RoundedButton, RoundedFrame, RoundedLineEdit, RoundedSwitch, RoundedTextEdit
+from rounded_widgets import RoundedButton, RoundedFrame, RoundedLineEdit, RoundedTextEdit
+from settings_view import build_settings_view
 from symbol_button import SymbolButton
 from style_sheets import apply_window_styles
 from title_bar import TitleBar
@@ -445,56 +445,7 @@ class KaomojiWindow(QWidget):
         self.stack.addWidget(self.main_view)
 
     def _build_settings_view(self):
-        self.settings_view = QWidget()
-        layout = QVBoxLayout(self.settings_view)
-        layout.setContentsMargins(16, 14, 16, 16)
-        layout.setSpacing(12)
-
-        header = QHBoxLayout()
-        back = RoundedButton("‹")
-        back.setFixedSize(30, 30)
-        back.clicked.connect(self._show_main)
-        title = QLabel("设置")
-        title.setObjectName("settingsTitle")
-        header.addWidget(back)
-        header.addWidget(title)
-        header.addStretch(1)
-        layout.addLayout(header)
-
-        hotkey_row = self._setting_row("快捷键", "全局唤起面板")
-        self.hotkey_edit = HotkeyEdit(self.config.get("hotkey", "ctrl+q"))
-        self.hotkey_edit.setFixedWidth(150)
-        self.hotkey_edit.hotkeyChanged.connect(self._update_hotkey)
-        hotkey_row.addWidget(self.hotkey_edit)
-        layout.addLayout(hotkey_row)
-
-        auto_row = self._setting_row("开机自启", "登录 Windows 后自动运行")
-        self.autostart_check = RoundedSwitch()
-        self.autostart_check.setChecked(self._is_auto_start_enabled())
-        self.autostart_check.toggled.connect(self._set_auto_start)
-        self.autostart_state = QLabel()
-        self.autostart_state.setObjectName("settingDesc")
-        self._sync_autostart_state_label(self.autostart_check.isChecked())
-        self.autostart_check.toggled.connect(self._sync_autostart_state_label)
-        auto_row.addWidget(self.autostart_state)
-        auto_row.addWidget(self.autostart_check)
-        layout.addLayout(auto_row)
-
-        layout.addStretch(1)
-        self.stack.addWidget(self.settings_view)
-
-    def _setting_row(self, label, desc):
-        row = QHBoxLayout()
-        text = QVBoxLayout()
-        title = QLabel(label)
-        title.setObjectName("settingLabel")
-        subtitle = QLabel(desc)
-        subtitle.setObjectName("settingDesc")
-        text.addWidget(title)
-        text.addWidget(subtitle)
-        row.addLayout(text)
-        row.addStretch(1)
-        return row
+        build_settings_view(self)
 
     def _apply_styles(self):
         apply_window_styles(self)

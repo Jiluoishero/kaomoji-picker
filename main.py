@@ -13,11 +13,9 @@ from PySide6.QtCore import QEasingCurve, QEvent, QMimeData, QPropertyAnimation, 
 from PySide6.QtGui import QColor, QCursor, QPainter
 from PySide6.QtWidgets import (
     QApplication,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMenu,
-    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -31,12 +29,12 @@ from clipboard_util import ClipboardUtil
 from data_actions import DataActionController
 from config_manager import ConfigManager
 from data_manager import DataManager
-from drag_widgets import SortableTabBar, SymbolContainer
 from flow_layout import FlowLayout
 from font_resolver import FontResolver
 from hotkey_parser import parse_hotkey
+from main_view import build_main_view
 from resize_handle import ResizeHandle
-from rounded_widgets import RoundedButton, RoundedFrame, RoundedLineEdit, RoundedTextEdit
+from rounded_widgets import RoundedFrame
 from settings_view import build_settings_view
 from symbol_button import SymbolButton
 from style_sheets import apply_window_styles
@@ -394,55 +392,7 @@ class KaomojiWindow(QWidget):
         self._position_resize_handles()
 
     def _build_main_view(self):
-        self.main_view = QWidget()
-        layout = QVBoxLayout(self.main_view)
-        layout.setContentsMargins(14, 10, 14, 14)
-        layout.setSpacing(9)
-
-        tab_row = QHBoxLayout()
-        tab_row.setContentsMargins(0, 0, 0, 0)
-        self.tabs = SortableTabBar(self)
-        self.tabs.setExpanding(False)
-        self.tabs.setMovable(True)
-        self.tabs.currentChanged.connect(self._set_current_group)
-        self.tabs.tabMoved.connect(self.data_actions.reorder_groups)
-        self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tabs.customContextMenuRequested.connect(self._show_group_context_menu)
-        tab_row.addWidget(self.tabs, 1)
-        layout.addLayout(tab_row)
-
-        self.add_box = RoundedFrame("addBox", self)
-        self.add_box.setObjectName("addBox")
-        add_layout = QVBoxLayout(self.add_box)
-        add_layout.setContentsMargins(10, 10, 10, 10)
-        self.add_hint = QLabel("每行输入一个符号")
-        self.add_text = RoundedTextEdit()
-        self.add_text.setFixedHeight(76)
-        add_buttons = QHBoxLayout()
-        add_buttons.addStretch(1)
-        cancel = RoundedButton("取消")
-        confirm = RoundedButton("确认添加")
-        cancel.clicked.connect(self._exit_add_mode)
-        confirm.clicked.connect(self._confirm_add)
-        add_buttons.addWidget(cancel)
-        add_buttons.addWidget(confirm)
-        add_layout.addWidget(self.add_hint)
-        add_layout.addWidget(self.add_text)
-        add_layout.addLayout(add_buttons)
-        self.add_box.hide()
-        layout.addWidget(self.add_box)
-
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.NoFrame)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.symbol_container = SymbolContainer(self)
-        self.symbol_container.setMinimumHeight(1)
-        self.scroll.setWidget(self.symbol_container)
-        layout.addWidget(self.scroll, 1)
-
-        self.stack.addWidget(self.main_view)
+        build_main_view(self)
 
     def _build_settings_view(self):
         build_settings_view(self)

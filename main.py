@@ -5,7 +5,6 @@ import sys
 import threading
 import time
 import unicodedata
-import winreg
 from ctypes import wintypes
 
 import win32api
@@ -35,6 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
 from clipboard_util import ClipboardUtil
 from config_manager import ConfigManager
 from data_manager import DataManager
@@ -87,8 +87,6 @@ MOD_SHIFT = 0x0004
 MOD_WIN = 0x0008
 MOD_NOREPEAT = 0x4000
 HOTKEY_ID = 1
-RUN_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
-RUN_VALUE_NAME = "KaomojiPicker"
 VK_TOP_ROW_DIGITS = tuple(range(0x31, 0x3A))
 VK_MODIFIERS = (
     win32con.VK_CONTROL,
@@ -2605,14 +2603,7 @@ class KaomojiWindow(QWidget):
 
     def _set_auto_start(self, enabled):
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY_PATH, 0, winreg.KEY_SET_VALUE) as key:
-                if enabled:
-                    winreg.SetValueEx(key, RUN_VALUE_NAME, 0, winreg.REG_SZ, self._auto_start_command())
-                else:
-                    try:
-                        winreg.DeleteValue(key, RUN_VALUE_NAME)
-                    except FileNotFoundError:
-                        pass
+            set_auto_start_enabled(enabled, __file__)
             self.config.set("auto_start", bool(enabled))
         except Exception as exc:
             log(f"Auto-start toggle failed: {exc}")
@@ -2625,24 +2616,9 @@ class KaomojiWindow(QWidget):
         if hasattr(self, "autostart_state"):
             self.autostart_state.setText("已开启" if enabled else "已关闭")
 
-    def _auto_start_command(self):
-        if getattr(sys, "frozen", False):
-            return f'"{sys.executable}"'
-
-        executable = sys.executable
-        if os.path.basename(executable).lower() == "python.exe":
-            pythonw = os.path.join(os.path.dirname(executable), "pythonw.exe")
-            if os.path.exists(pythonw):
-                executable = pythonw
-        return f'"{executable}" "{os.path.abspath(__file__)}"'
-
     def _is_auto_start_enabled(self):
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY_PATH, 0, winreg.KEY_READ) as key:
-                value, _ = winreg.QueryValueEx(key, RUN_VALUE_NAME)
-            return value == self._auto_start_command()
-        except FileNotFoundError:
-            return False
+            return is_auto_start_enabled(__file__)
         except OSError as exc:
             log(f"Auto-start read failed: {exc}")
             return bool(self.config.get("auto_start", False))

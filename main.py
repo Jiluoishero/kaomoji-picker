@@ -28,9 +28,9 @@ from app_shell import KaomojiApp
 from app_logging import log
 from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
 from clipboard_util import ClipboardUtil
+from data_actions import DataActionController
 from config_manager import ConfigManager
 from data_manager import DataManager
-from dialogs import ConfirmDialog, SimpleInputDialog
 from drag_widgets import SortableTabBar, SymbolContainer
 from flow_layout import FlowLayout
 from font_resolver import FontResolver
@@ -91,6 +91,7 @@ class KaomojiWindow(QWidget):
         self.setWindowTitle("颜文字输入器")
         self.config = ConfigManager()
         self.data = DataManager()
+        self.data_actions = DataActionController(self)
         self.clipboard = ClipboardUtil()
         self.current_group_index = 0
         self.mode = "single"
@@ -417,7 +418,7 @@ class KaomojiWindow(QWidget):
         self.tabs.setExpanding(False)
         self.tabs.setMovable(True)
         self.tabs.currentChanged.connect(self._set_current_group)
-        self.tabs.tabMoved.connect(self._reorder_groups)
+        self.tabs.tabMoved.connect(self.data_actions.reorder_groups)
         self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabs.customContextMenuRequested.connect(self._show_group_context_menu)
         tab_row.addWidget(self.tabs, 1)
@@ -1171,9 +1172,9 @@ class KaomojiWindow(QWidget):
         delete_action = menu.addAction("删除")
         action = menu.exec(button.mapToGlobal(pos))
         if action in move_actions:
-            self._move_symbol(symbol, move_actions[action])
+            self.data_actions.move_symbol(symbol, move_actions[action])
         elif action == delete_action:
-            self._delete_symbol(symbol)
+            self.data_actions.delete_symbol(symbol)
 
     def _show_group_context_menu(self, pos):
         index = self.tabs.tabAt(pos)
@@ -1183,7 +1184,7 @@ class KaomojiWindow(QWidget):
             menu.setSeparatorsCollapsible(False)
             add_group_action = menu.addAction("添加新分组")
             if menu.exec(self.tabs.mapToGlobal(pos)) == add_group_action:
-                self._add_group()
+                self.data_actions.add_group()
             return
         self.current_group_index = index
         self.tabs.setCurrentIndex(index)
@@ -1201,11 +1202,11 @@ class KaomojiWindow(QWidget):
         if action == add_items_action:
             self._enter_add_mode(group_name)
         elif action == rename_group_action:
-            self._rename_group(group_name)
+            self.data_actions.rename_group(group_name)
         elif action == delete_group_action:
-            self._confirm_delete_group(group_name)
+            self.data_actions.confirm_delete_group(group_name)
         elif action == add_group_action:
-            self._add_group()
+            self.data_actions.add_group()
 
     def _render_symbols(self, generation=None):
         if generation is not None and generation != self._layout_generation:
@@ -1439,56 +1440,6 @@ class KaomojiWindow(QWidget):
         except OSError as exc:
             log(f"Auto-start read failed: {exc}")
             return bool(self.config.get("auto_start", False))
-
-    def _delete_symbol(self, symbol):
-        groups = self.data.get_groups()
-        if groups:
-            self.data.delete_item(groups[self.current_group_index]["name"], symbol)
-            self._render_symbols()
-
-    def _move_symbol(self, symbol, target_group_name):
-        groups = self.data.get_groups()
-        if not groups:
-            return
-        source_group_name = groups[self.current_group_index]["name"]
-        if self.data.move_item(source_group_name, target_group_name, symbol):
-            self._render_symbols()
-
-    def _confirm_delete_group(self, group_name):
-        ok = ConfirmDialog.ask(
-            self,
-            "删除分组",
-            f"确定删除分组「{group_name}」？\n组内表情会一并删除。",
-            confirm_text="删除",
-            cancel_text="取消",
-        )
-        if not ok:
-            return
-        self.data.delete_group(group_name)
-        self.current_group_index = 0
-        self._reload_tabs()
-
-    def _add_group(self):
-        name, ok = SimpleInputDialog.get_text(self, "新分组", "输入分组名称")
-        if ok and name.strip():
-            self.data.add_group(name.strip())
-            self._reload_tabs()
-
-    def _rename_group(self, group_name):
-        name, ok = SimpleInputDialog.get_text(self, "重命名分组", "输入新的分组名称", group_name)
-        new_name = name.strip()
-        if ok and new_name and new_name != group_name:
-            self.data.rename_group(group_name, new_name)
-            self._reload_tabs()
-
-    def _reorder_groups(self, from_index, to_index):
-        groups = self.data.get_groups()
-        names = [g["name"] for g in groups]
-        moved = names.pop(from_index)
-        names.insert(to_index, moved)
-        self.data.reorder_groups(names)
-        self.current_group_index = to_index
-        self.data.save()
 
     def _save_window_size(self):
         self.config.set("window_width", self.base_window_size.width())

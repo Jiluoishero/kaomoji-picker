@@ -1333,6 +1333,8 @@ class KaomojiWindow(QWidget):
     def _apply_window_activation_policy(self):
         if sys.platform != "win32":
             return
+        # The picker normally must not activate, otherwise clicks steal focus from
+        # the target input window and Ctrl+V can paste into the picker instead.
         hwnd = self._visible_panel_hwnd() if self.isVisible() else self._hwnd()
         ex_style = win32gui.GetWindowLong(hwnd, GWL_EXSTYLE)
         ex_style |= WS_EX_TOOLWINDOW
@@ -1360,6 +1362,7 @@ class KaomojiWindow(QWidget):
             log(f"DWM style failed: {exc}")
 
     def _set_allow_activation(self, enabled):
+        # Settings and edit dialogs need real focus; symbol picking does not.
         self.allow_activation = bool(enabled)
         self._apply_window_activation_policy()
 
@@ -2091,6 +2094,7 @@ class KaomojiWindow(QWidget):
             self._suppress_resize_render = False
         self.setWindowOpacity(0.0)
         self.show()
+        # Let Qt create/show the native window before reapplying Win32 styles.
         QApplication.processEvents()
         self._render_symbols()
         self._apply_window_activation_policy()
@@ -2666,6 +2670,8 @@ class BaseDarkDialog(QDialog):
         )
 
     def exec_with_activation(self):
+        # Dialogs temporarily opt out of the NOACTIVATE panel policy so inputs
+        # can receive keyboard focus, then restore the picker behavior.
         self.parent_window._set_allow_activation(True)
         try:
             self.parent_window.activateWindow()

@@ -50,11 +50,12 @@ python main.py
 .\build_exe.bat
 ```
 
-打包产物位于 `dist\KaomojiPicker\KaomojiPicker.exe`。当前采用 `onedir` 形式，`data.json` 会随 exe 放在同一目录，方便用户继续编辑和保存默认表情数据。
+打包产物位于 `dist\KaomojiPicker\KaomojiPicker.exe`。当前采用 `onedir` 形式，`data.json` 和 `icon/` 会随 exe 放在同一目录。`data.json` 是可编辑的默认颜文字包，`icon/` 是标题栏 SVG 资源。
 
 ## 数据与配置
 
-- `data.json` 是默认表情数据，发布时随程序一起保留。
+- `data.json` 是默认颜文字包，发布时随程序一起保留。
+- `icon/` 是标题栏 SVG 图标资源，发布时随程序一起保留。
 - `config.json` 是用户本机配置，首次启动时会自动生成，包含快捷键、窗口大小、开机自启等设置。
 - 发布前不要打包 `config.json`、`*.log`、`__pycache__/`、`build/`、`dist/`。
 
@@ -66,6 +67,7 @@ clipboard_util.py  # 剪贴板与粘贴模拟
 data_manager.py    # data.json 读写
 config_manager.py  # config.json 读写
 data.json          # 默认表情数据
+icon/              # 标题栏 SVG 图标资源
 requirements.txt   # Python 依赖
 start.bat          # 一键启动脚本
 build_exe.bat      # PyInstaller 打包脚本

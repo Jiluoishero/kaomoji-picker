@@ -5,6 +5,8 @@ import unittest
 
 import win32con
 from PySide6.QtCore import QByteArray, QMimeData, QPoint, QRect
+from PySide6.QtGui import QTextCursor
+from PySide6.QtWidgets import QApplication
 
 from app_constants import DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 from app_paths import runtime_file
@@ -19,6 +21,7 @@ from hotkey_parser import (
     parse_hotkey,
 )
 from resize_geometry import resize_handle_geometries, resized_window_geometry
+from rounded_widgets import RoundedTextEdit
 from symbol_drag import SYMBOL_MIME_TYPE, parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
 
 
@@ -125,6 +128,22 @@ class SymbolDragTests(unittest.TestCase):
 
         self.assertEqual(symbol_insert_marker_rect(1, buttons, 120), QRect(44, 0, 4, 30))
         self.assertEqual(symbol_insert_marker_rect(2, buttons, 120), QRect(97, 0, 4, 30))
+
+
+class RoundedTextEditTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_applies_font_fallback_per_character(self):
+        editor = RoundedTextEdit()
+        editor.set_font_resolver(lambda ch: "Segoe UI Emoji" if ch == "★" else "Microsoft YaHei UI")
+        editor.setPlainText("A★")
+
+        cursor = QTextCursor(editor.document())
+        cursor.setPosition(1)
+        cursor.setPosition(2, QTextCursor.KeepAnchor)
+        self.assertIn("Segoe UI Emoji", cursor.charFormat().fontFamilies())
 
 
 if __name__ == "__main__":

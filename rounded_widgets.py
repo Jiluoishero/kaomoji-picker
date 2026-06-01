@@ -1,5 +1,7 @@
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath
+import unicodedata
+
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QCheckBox, QFrame, QLineEdit, QPushButton, QTextEdit
 
 from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
@@ -154,9 +156,43 @@ class RoundedLineEdit(QLineEdit):
 class RoundedTextEdit(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._font_resolver = None
+        self._applying_fallback_fonts = False
         self.setAttribute(Qt.WA_StyledBackground, False)
         self.setViewportMargins(8, 8, 8, 8)
         self.viewport().setAutoFillBackground(False)
+        self.textChanged.connect(self._apply_fallback_fonts)
+
+    def set_font_resolver(self, font_resolver):
+        self._font_resolver = font_resolver
+        self._apply_fallback_fonts()
+
+    def _apply_fallback_fonts(self):
+        if self._applying_fallback_fonts or not self._font_resolver:
+            return
+
+        self._applying_fallback_fonts = True
+        try:
+            document = self.document()
+            original_cursor = self.textCursor()
+            cursor = QTextCursor(document)
+            utf16_offset = 0
+            current_family = None
+
+            for ch in self.toPlainText():
+                if not unicodedata.category(ch).startswith("M") or current_family is None:
+                    current_family = self._font_resolver(ch)
+                utf16_length = len(ch.encode("utf-16-le")) // 2
+                cursor.setPosition(utf16_offset)
+                cursor.setPosition(utf16_offset + utf16_length, QTextCursor.KeepAnchor)
+                fmt = QTextCharFormat()
+                fmt.setFontFamilies([current_family])
+                cursor.mergeCharFormat(fmt)
+                utf16_offset += utf16_length
+
+            self.setTextCursor(original_cursor)
+        finally:
+            self._applying_fallback_fonts = False
 
     def _colors(self):
         theme = window_theme(self)

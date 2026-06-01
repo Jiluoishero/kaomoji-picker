@@ -42,9 +42,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
+if exist "dist\KaomojiPicker\icon" rmdir /s /q "dist\KaomojiPicker\icon"
+xcopy /e /i /y "icon" "dist\KaomojiPicker\icon" >nul
+if errorlevel 1 (
+    echo Failed to copy icon assets next to the exe.
+    pause
+    exit /b 1
+)
+
 echo.
 echo Build complete: dist\KaomojiPicker\KaomojiPicker.exe
-echo Keep data.json next to the exe if you want editable default data.
+echo Keep data.json and icon next to the exe.
 pause
 
 endlocal

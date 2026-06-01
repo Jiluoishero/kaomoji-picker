@@ -56,10 +56,12 @@ def apply_window_styles(self):
             }
             QToolButton#titleIconButton {
                 font-size: 16px;
+                border-radius: 16px;
             }
             QToolButton#closeButton {
                 padding: 0px;
                 font-size: 18px;
+                border-radius: 16px;
             }
             QToolButton#closeButton:hover { background: #f04848; color: white; border-color: transparent; }
             QTabBar::tab {
@@ -256,10 +258,12 @@ def apply_window_styles(self):
             }
             QToolButton#titleIconButton {
                 font-size: 16px;
+                border-radius: 16px;
             }
             QToolButton#closeButton {
                 padding: 0px;
                 font-size: 18px;
+                border-radius: 16px;
             }
             QToolButton#closeButton:hover { background: #e03030; color: white; border-color: transparent; }
             QTabBar::tab {

@@ -1,6 +1,12 @@
 # 颜文字输入器
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 一个适用于 Windows 的桌面颜文字与符号快速输入工具。程序常驻系统托盘，可通过全局快捷键在鼠标附近唤起浮动面板，点击颜文字后自动粘贴到原本正在输入的位置。
+
+## 直接使用发布版
+
+前往 [Releases](../../releases) 页面，下载最新版本的压缩包，解压后双击 `KaomojiPicker.exe` 即可运行，无需安装 Python 环境。
 
 ## 使用方式
 
@@ -17,19 +23,10 @@
 - 右键分组，可新建、重命名或删除分组。
 - 在输入框中输入多个颜文字或符号，可批量添加到当前分组。
 
-设置页可以修改全局快捷键、切换开机启动，并进入排序模式。标题栏提供固定模式、深浅主题切换、设置和关闭按钮。
+鼠标滚轮和非小键盘数字键可切换分组。
 
-## 直接使用发布版
+设置页可以修改全局快捷键、切换开机启动。
 
-发布包采用 `onedir` 形式。运行：
-
-```text
-KaomojiPicker.exe
-```
-
-不要单独移动 exe。发布目录中的 `data.json`、`icon/` 和 `_internal/` 都需要与 exe 保持在同一目录。
-
-`data.json` 是默认颜文字包，也会保存用户在界面中做出的编辑。首次运行后，程序会在 exe 同级目录生成本机配置文件 `config.json`。
 
 ## 从源码运行
 
@@ -37,6 +34,10 @@ KaomojiPicker.exe
 
 - Windows
 - Python 3.10+
+
+双击`start.bat`
+
+或
 
 安装依赖：
 
@@ -49,8 +50,6 @@ pip install -r requirements.txt
 ```powershell
 python main.py
 ```
-
-也可以双击 `start.bat`。开发时可使用 `start_dev.bat`。
 
 ## 打包
 
@@ -73,21 +72,14 @@ dist\KaomojiPicker\
 ## 项目结构
 
 ```text
-main.py              # 主窗口、Win32 热键、窗口焦点策略和应用入口
-app_shell.py         # QApplication 与系统托盘生命周期
-main_view.py         # 主面板 UI 组装
-settings_view.py     # 设置页 UI 组装
-data_manager.py      # 分组与颜文字数据读写
-data_actions.py      # 数据编辑操作控制层
-symbol_button.py     # 单个颜文字块的绘制和拖动
-drag_widgets.py      # 分组与颜文字拖动相关控件
-font_resolver.py     # 特殊字符字体 fallback
-clipboard_util.py    # 剪贴板与模拟粘贴
-autostart_manager.py # 开机启动注册表读写
-icon/                # 程序图标和标题栏 SVG 图标
-data.json            # 默认颜文字包
-build_exe.bat        # Windows 打包脚本
-项目状态.md           # 当前架构和 Windows 行为边界说明
+main.py          # 源码启动入口
+kaomoji_picker/  # 应用源码包
+tests/           # 核心逻辑测试
+icon/            # 程序图标和标题栏 SVG 图标
+data.json        # 默认颜文字包
+build_exe.bat    # Windows 打包脚本
 ```
 
-更完整的技术栈、模块职责和重构注意事项见 `项目状态.md`。
+## 许可证
+
+本项目基于 [MIT 许可证](LICENSE) 开源。

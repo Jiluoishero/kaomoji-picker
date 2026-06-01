@@ -21,6 +21,7 @@ if errorlevel 1 (
 
 %PYTHON_EXE% -m PyInstaller ^
     --noconfirm ^
+    --clean ^
     --windowed ^
     --onedir ^
     --name KaomojiPicker ^

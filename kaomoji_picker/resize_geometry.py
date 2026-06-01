@@ -1,6 +1,6 @@
 from PySide6.QtCore import QRect
 
-from app_constants import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
+from kaomoji_picker.app_constants import MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
 
 
 def resize_handle_geometries(width, height):

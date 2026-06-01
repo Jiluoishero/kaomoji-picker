@@ -1,6 +1,6 @@
 import time
 
-from app_paths import runtime_file
+from kaomoji_picker.app_paths import runtime_file
 
 
 LOG_PATH = runtime_file(__file__, "debug.log")

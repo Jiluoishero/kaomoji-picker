@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QWidget
 
-from symbol_button import SymbolButton
+from kaomoji_picker.symbol_button import SymbolButton
 
 
 def render_symbols(window, generation=None):

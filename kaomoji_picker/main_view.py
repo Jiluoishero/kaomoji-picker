@@ -1,8 +1,8 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from drag_widgets import SortableTabBar, SymbolContainer
-from rounded_widgets import RoundedButton, RoundedFrame, RoundedTextEdit
+from kaomoji_picker.drag_widgets import SortableTabBar, SymbolContainer
+from kaomoji_picker.rounded_widgets import RoundedButton, RoundedFrame, RoundedTextEdit
 
 
 def build_main_view(window):

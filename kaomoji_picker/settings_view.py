@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from hotkey_edit import HotkeyEdit
-from rounded_widgets import RoundedButton, RoundedSwitch
+from kaomoji_picker.hotkey_edit import HotkeyEdit
+from kaomoji_picker.rounded_widgets import RoundedButton, RoundedSwitch
 
 
 def build_settings_view(window):

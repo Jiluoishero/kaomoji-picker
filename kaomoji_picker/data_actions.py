@@ -1,4 +1,4 @@
-from dialogs import ConfirmDialog, SimpleInputDialog
+from kaomoji_picker.dialogs import ConfirmDialog, SimpleInputDialog
 
 
 class DataActionController:

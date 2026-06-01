@@ -1,7 +1,7 @@
 import json
 import os
 
-from app_paths import runtime_file
+from kaomoji_picker.app_paths import runtime_file
 
 DEFAULT_DATA = {
     "groups": [

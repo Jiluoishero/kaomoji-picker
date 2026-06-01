@@ -5,7 +5,7 @@ from PySide6.QtGui import QColor, QPainter, QPixmap, QPolygonF
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QToolButton, QWidget
 
-from app_paths import runtime_file
+from kaomoji_picker.app_paths import runtime_file
 
 
 def _icon_path(filename):

@@ -1,8 +1,8 @@
 from PySide6.QtGui import QAction, QFont, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from app_logging import log
-from app_paths import runtime_file
+from kaomoji_picker.app_logging import log
+from kaomoji_picker.app_paths import runtime_file
 
 
 class KaomojiApp(QApplication):

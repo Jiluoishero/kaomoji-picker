@@ -2,8 +2,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout
 
-from rounded_widgets import RoundedButton, RoundedLineEdit
-from ui_helpers import draw_rounded_fill_box
+from kaomoji_picker.rounded_widgets import RoundedButton, RoundedLineEdit
+from kaomoji_picker.ui_helpers import draw_rounded_fill_box
 
 
 class BaseDarkDialog(QDialog):

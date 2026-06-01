@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QKeySequence, QPainter
 from PySide6.QtWidgets import QLineEdit
 
-from ui_helpers import draw_rounded_fill_box, window_theme
+from kaomoji_picker.ui_helpers import draw_rounded_fill_box, window_theme
 
 
 class HotkeyEdit(QLineEdit):

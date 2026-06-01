@@ -1,6 +1,6 @@
-from app_logging import log
-from autostart_manager import is_auto_start_enabled, set_auto_start_enabled
-from hotkey_parser import parse_hotkey
+from kaomoji_picker.app_logging import log
+from kaomoji_picker.autostart_manager import is_auto_start_enabled, set_auto_start_enabled
+from kaomoji_picker.hotkey_parser import parse_hotkey
 
 
 def update_hotkey(window, hotkey=None):

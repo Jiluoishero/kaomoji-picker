@@ -4,7 +4,7 @@ import unicodedata
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QCheckBox, QFrame, QLineEdit, QPushButton, QTextEdit
 
-from ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
+from kaomoji_picker.ui_helpers import draw_rounded_fill_box, in_dark_dialog, window_theme
 
 
 class RoundedFrame(QFrame):

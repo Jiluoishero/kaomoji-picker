@@ -8,11 +8,11 @@ from PySide6.QtCore import QByteArray, QMimeData, QPoint, QRect
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QApplication
 
-from app_constants import DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
-from app_paths import runtime_file
-from config_manager import ConfigManager
-from data_manager import DataManager
-from hotkey_parser import (
+from kaomoji_picker.app_constants import DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH
+from kaomoji_picker.app_paths import runtime_file
+from kaomoji_picker.config_manager import ConfigManager
+from kaomoji_picker.data_manager import DataManager
+from kaomoji_picker.hotkey_parser import (
     MOD_ALT,
     MOD_CONTROL,
     MOD_NOREPEAT,
@@ -20,9 +20,9 @@ from hotkey_parser import (
     MOD_WIN,
     parse_hotkey,
 )
-from resize_geometry import resize_handle_geometries, resized_window_geometry
-from rounded_widgets import RoundedTextEdit
-from symbol_drag import SYMBOL_MIME_TYPE, parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
+from kaomoji_picker.resize_geometry import resize_handle_geometries, resized_window_geometry
+from kaomoji_picker.rounded_widgets import RoundedTextEdit
+from kaomoji_picker.symbol_drag import SYMBOL_MIME_TYPE, parse_symbol_drag_payload, symbol_insert_index_at, symbol_insert_marker_rect
 
 
 class FakeButton:
@@ -47,9 +47,10 @@ class HotkeyParserTests(unittest.TestCase):
 
 
 class RuntimePathTests(unittest.TestCase):
-    def test_runtime_file_uses_module_directory_when_not_frozen(self):
+    def test_runtime_file_uses_project_directory_when_not_frozen(self):
         path = runtime_file(__file__, "sample.json")
-        self.assertEqual(path, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample.json"))
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.assertEqual(path, os.path.join(project_dir, "sample.json"))
 
 
 class ManagerTests(unittest.TestCase):

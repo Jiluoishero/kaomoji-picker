@@ -1,8 +1,8 @@
 import json
 import os
 
-from app_constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
-from app_paths import runtime_file
+from kaomoji_picker.app_constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
+from kaomoji_picker.app_paths import runtime_file
 
 DEFAULT_CONFIG = {
     "hotkey": "ctrl+q",

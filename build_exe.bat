@@ -8,6 +8,13 @@ if exist ".venv\Scripts\python.exe" (
     set "PYTHON_EXE=.venv\Scripts\python.exe"
 )
 
+tasklist /fi "imagename eq KaomojiPicker.exe" | find /i "KaomojiPicker.exe" >nul
+if not errorlevel 1 (
+    echo Please exit KaomojiPicker.exe before building.
+    pause
+    exit /b 1
+)
+
 %PYTHON_EXE% -c "import PyInstaller" >nul 2>nul
 if errorlevel 1 (
     echo Installing PyInstaller...

@@ -1,26 +1,42 @@
 # 颜文字输入器
 
-一个 Windows 桌面颜文字/符号快速输入工具。按全局快捷键唤起 Qt 原生浮动面板，点击符号后自动粘贴到唤起前的窗口。
+一个适用于 Windows 的桌面颜文字与符号快速输入工具。程序常驻系统托盘，可通过全局快捷键在鼠标附近唤起浮动面板，点击颜文字后自动粘贴到原本正在输入的位置。
 
-## 功能
+## 使用方式
 
-- 全局快捷键唤起面板，默认 `Ctrl + Q`，可在设置里修改。
-- 单次模式：选择一个符号后自动关闭。
-- 固定模式：短时间内连续按两次快捷键，可连续选择多个符号。
-- 分组展示、批量添加、右键删除/移动表情、右键新增/重命名/删除分组、分组拖拽排序。
-- 支持深浅色主题实时切换（星空深色版与温馨奶油版），切换按钮位于设置旁边。
-- 设置中可进入排序模式，支持拖拽调整分组顺序、表情顺序，以及将表情拖到其他分组。
-- 面板支持多屏定位、标题栏拖动、窗口大小保存。
-- 支持开机自启，源码运行和打包后的 exe 都使用当前程序路径注册。
-- 系统托盘菜单：显示面板、退出。
-- 默认表情数据保存在 `data.json`。
-- 用户配置保存在运行时生成的 `config.json`，发布包不需要预置该文件。
+1. 启动程序后，它会常驻系统托盘。
+2. 按 `Ctrl + Q` 在鼠标附近唤起颜文字面板。
+3. 点击颜文字块，将内容粘贴到唤起面板前的输入窗口。
+4. 短时间内连续按两次快捷键可进入固定模式，连续选择多个颜文字。
 
-## 环境
+面板支持直接编辑：
+
+- 可直接拖动分组，调整分组顺序。
+- 可直接拖动颜文字块，调整顺序或移动到其他分组。
+- 右键颜文字块，可删除或移动颜文字。
+- 右键分组，可新建、重命名或删除分组。
+- 在输入框中输入多个颜文字或符号，可批量添加到当前分组。
+
+设置页可以修改全局快捷键、切换开机启动，并进入排序模式。标题栏提供固定模式、深浅主题切换、设置和关闭按钮。
+
+## 直接使用发布版
+
+发布包采用 `onedir` 形式。运行：
+
+```text
+KaomojiPicker.exe
+```
+
+不要单独移动 exe。发布目录中的 `data.json`、`icon/` 和 `_internal/` 都需要与 exe 保持在同一目录。
+
+`data.json` 是默认颜文字包，也会保存用户在界面中做出的编辑。首次运行后，程序会在 exe 同级目录生成本机配置文件 `config.json`。
+
+## 从源码运行
+
+环境要求：
 
 - Windows
 - Python 3.10+
-- PySide6 / Qt
 
 安装依赖：
 
@@ -28,47 +44,50 @@
 pip install -r requirements.txt
 ```
 
-## 运行
+运行：
 
 ```powershell
 python main.py
 ```
 
-或直接运行根目录的一键启动脚本：
-
-```powershell
-.\start.bat
-```
-
-程序启动后会进入系统托盘。按 `Ctrl + Q` 在鼠标附近显示面板。
+也可以双击 `start.bat`。开发时可使用 `start_dev.bat`。
 
 ## 打包
 
-根目录提供 PyInstaller 打包脚本：
+项目使用 PyInstaller 生成 Windows 发布包：
 
 ```powershell
 .\build_exe.bat
 ```
 
-打包产物位于 `dist\KaomojiPicker\KaomojiPicker.exe`。当前采用 `onedir` 形式，`data.json` 和 `icon/` 会随 exe 放在同一目录。`data.json` 是可编辑的默认颜文字包，`icon/` 是标题栏 SVG 资源。
-
-## 数据与配置
-
-- `data.json` 是默认颜文字包，发布时随程序一起保留。
-- `icon/` 是标题栏 SVG 图标资源，发布时随程序一起保留。
-- `config.json` 是用户本机配置，首次启动时会自动生成，包含快捷键、窗口大小、开机自启等设置。
-- 发布前不要打包 `config.json`、`*.log`、`__pycache__/`、`build/`、`dist/`。
-
-## 文件结构
+完成后，发布目录位于：
 
 ```text
-main.py            # Qt 入口、窗口、热键、托盘生命周期
-clipboard_util.py  # 剪贴板与粘贴模拟
-data_manager.py    # data.json 读写
-config_manager.py  # config.json 读写
-data.json          # 默认表情数据
-icon/              # 标题栏 SVG 图标资源
-requirements.txt   # Python 依赖
-start.bat          # 一键启动脚本
-build_exe.bat      # PyInstaller 打包脚本
+dist\KaomojiPicker\
 ```
+
+其中 `KaomojiPicker.exe` 可直接双击运行。打包脚本会自动复制默认 `data.json` 和 `icon/` 资源目录。
+
+发布前不要将源码运行时产生的 `config.json`、`*.log`、`__pycache__/`、`build/` 或 PyInstaller `*.spec` 文件放入发布包。
+
+## 项目结构
+
+```text
+main.py              # 主窗口、Win32 热键、窗口焦点策略和应用入口
+app_shell.py         # QApplication 与系统托盘生命周期
+main_view.py         # 主面板 UI 组装
+settings_view.py     # 设置页 UI 组装
+data_manager.py      # 分组与颜文字数据读写
+data_actions.py      # 数据编辑操作控制层
+symbol_button.py     # 单个颜文字块的绘制和拖动
+drag_widgets.py      # 分组与颜文字拖动相关控件
+font_resolver.py     # 特殊字符字体 fallback
+clipboard_util.py    # 剪贴板与模拟粘贴
+autostart_manager.py # 开机启动注册表读写
+icon/                # 程序图标和标题栏 SVG 图标
+data.json            # 默认颜文字包
+build_exe.bat        # Windows 打包脚本
+项目状态.md           # 当前架构和 Windows 行为边界说明
+```
+
+更完整的技术栈、模块职责和重构注意事项见 `项目状态.md`。

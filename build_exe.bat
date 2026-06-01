@@ -24,6 +24,7 @@ if errorlevel 1 (
     --windowed ^
     --onedir ^
     --name KaomojiPicker ^
+    --icon "icon\icon.ico" ^
     --exclude-module PyQt5 ^
     --exclude-module PyQt6 ^
     --exclude-module PySide2 ^
